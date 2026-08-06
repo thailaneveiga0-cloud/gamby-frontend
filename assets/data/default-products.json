@@ -1,0 +1,170 @@
+[
+  {
+    "name": "Lápis Preto HB",
+    "code": "ESC001",
+    "category": "Escolar",
+    "price": 2.5,
+    "stock": 80
+  },
+  {
+    "name": "Livro de Abecedário",
+    "code": "ESC002",
+    "category": "Escolar",
+    "price": 24.9,
+    "stock": 18
+  },
+  {
+    "name": "Livro Fofo",
+    "code": "ESC003",
+    "category": "Escolar",
+    "price": 29.9,
+    "stock": 14
+  },
+  {
+    "name": "Caderno Brochura",
+    "code": "ESC004",
+    "category": "Escolar",
+    "price": 12.9,
+    "stock": 40
+  },
+  {
+    "name": "Caderno Universitário",
+    "code": "ESC005",
+    "category": "Escolar",
+    "price": 18.9,
+    "stock": 32
+  },
+  {
+    "name": "Borracha Branca",
+    "code": "ESC006",
+    "category": "Escolar",
+    "price": 3.5,
+    "stock": 60
+  },
+  {
+    "name": "Apontador Simples",
+    "code": "ESC007",
+    "category": "Escolar",
+    "price": 4.0,
+    "stock": 55
+  },
+  {
+    "name": "Caneta Azul",
+    "code": "ESC008",
+    "category": "Escolar",
+    "price": 2.9,
+    "stock": 70
+  },
+  {
+    "name": "Caneta Preta",
+    "code": "ESC009",
+    "category": "Escolar",
+    "price": 2.9,
+    "stock": 65
+  },
+  {
+    "name": "Caneta Vermelha",
+    "code": "ESC010",
+    "category": "Escolar",
+    "price": 2.9,
+    "stock": 48
+  },
+  {
+    "name": "Estojo Infantil",
+    "code": "ESC011",
+    "category": "Escolar",
+    "price": 22.5,
+    "stock": 20
+  },
+  {
+    "name": "Mochila Escolar",
+    "code": "ESC012",
+    "category": "Escolar",
+    "price": 89.9,
+    "stock": 12
+  },
+  {
+    "name": "Tesoura sem Ponta",
+    "code": "ESC013",
+    "category": "Escolar",
+    "price": 8.9,
+    "stock": 22
+  },
+  {
+    "name": "Cola Branca",
+    "code": "ESC014",
+    "category": "Escolar",
+    "price": 6.5,
+    "stock": 38
+  },
+  {
+    "name": "Régua 30cm",
+    "code": "ESC015",
+    "category": "Escolar",
+    "price": 5.9,
+    "stock": 28
+  },
+  {
+    "name": "Giz de Cera",
+    "code": "ESC016",
+    "category": "Escolar",
+    "price": 9.9,
+    "stock": 24
+  },
+  {
+    "name": "Lápis de Cor",
+    "code": "ESC017",
+    "category": "Escolar",
+    "price": 15.9,
+    "stock": 26
+  },
+  {
+    "name": "Massa de Modelar",
+    "code": "ESC018",
+    "category": "Escolar",
+    "price": 11.5,
+    "stock": 16
+  },
+  {
+    "name": "Agenda Escolar",
+    "code": "ESC019",
+    "category": "Escolar",
+    "price": 19.9,
+    "stock": 13
+  },
+  {
+    "name": "Papel A4",
+    "code": "ESC020",
+    "category": "Papelaria",
+    "price": 32.9,
+    "stock": 25
+  },
+  {
+    "name": "Envelope Colorido",
+    "code": "ESC021",
+    "category": "Papelaria",
+    "price": 1.5,
+    "stock": 120
+  },
+  {
+    "name": "Cartolina",
+    "code": "ESC022",
+    "category": "Papelaria",
+    "price": 2.2,
+    "stock": 75
+  },
+  {
+    "name": "Marcador de Texto",
+    "code": "ESC023",
+    "category": "Escolar",
+    "price": 6.9,
+    "stock": 34
+  },
+  {
+    "name": "Pasta Catálogo",
+    "code": "ESC024",
+    "category": "Papelaria",
+    "price": 14.9,
+    "stock": 19
+  }
+]

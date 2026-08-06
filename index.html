@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gamby Fluxo Caixa Pro — Stage 8 Modular</title>
+  <link rel="stylesheet" href="assets/css/base.css" />
+  <link rel="stylesheet" href="assets/css/auth.css" />
+  <link rel="stylesheet" href="assets/css/dashboard.css" />
+</head>
+<body>
+  <section id="authRoot" class="auth-wrap">
+    <header class="auth-topbar">
+      <div class="auth-brand">
+        <div class="logo-badge">G</div>
+        <div>
+          <strong>Gamby Fluxo Caixa Pro</strong>
+          <div class="mini">Refatoração modular — etapa 8</div>
+        </div>
+      </div>
+      <span class="pill">Base modular pronta para backend</span>
+    </header>
+
+    <main class="hero-grid">
+      <article class="panel hero-panel">
+        <span class="tag tag-primary">Login simples • cadastro guiado • planos</span>
+        <h1>Visual premium com código separado por responsabilidades.</h1>
+        <p class="muted-lg">
+          Na etapa 8, a base ficou preparada para backend real: configuração de API, cliente HTTP, serviços por domínio e estratégia de fallback local sem quebrar o que já funciona.
+        </p>
+        <div class="hero-actions">
+          <button class="btn btn-primary" data-action="focus-login">Entrar agora</button>
+          <button class="btn btn-ghost" data-action="open-register">Cadastre-se</button>
+          <a href="#plansSection" class="btn btn-ghost">Ver planos</a>
+        </div>
+        <div class="feature-grid">
+          <div class="feature-card"><strong>Etapa 8</strong><span>Preparação para API, autenticação real e sincronização futura.</span></div>
+          <div class="feature-card"><strong>Administração</strong><span>Backup visível só para administradora e desenvolvedora.</span></div>
+          <div class="feature-card"><strong>Estabilidade</strong><span>Fluxos críticos revisados para uso contínuo.</span></div>
+        </div>
+      </article>
+
+      <article class="panel login-panel">
+        <div class="auth-brand auth-brand-inline">
+          <div class="logo-badge">G</div>
+          <div>
+            <strong>Gamby Fluxo Caixa Pro</strong>
+            <div class="mini">Acesso rápido ao painel</div>
+          </div>
+        </div>
+        <h2>Acesse seu painel</h2>
+        <p class="muted">Entre com seu e-mail/usuário e senha. Se ainda não tiver conta, faça o cadastro e avance pelas etapas.</p>
+        <div class="field-group">
+          <label for="loginUser">E-mail ou usuário</label>
+          <input id="loginUser" class="field" placeholder="seuemail@empresa.com" autocomplete="username" />
+        </div>
+        <div class="field-group">
+          <label for="loginPass">Senha</label>
+          <input id="loginPass" class="field" type="password" placeholder="Digite sua senha" autocomplete="current-password" />
+        </div>
+        <div class="hero-actions compact">
+          <button class="btn btn-primary" data-action="login">Entrar</button>
+          <button class="btn btn-link" data-action="open-register">Ainda não tem cadastro? Cadastre-se</button>
+        </div>
+        <div id="authMessageBox" class="notice">
+          Acesse com sua conta ou inicie o cadastro guiado para experimentar a estrutura modular estabilizada do Gamby.
+        </div>
+      </article>
+    </main>
+
+    <section id="plansSection" class="plans-section">
+      <div class="section-head">
+        <div>
+          <h3>Planos de assinatura</h3>
+          <p class="mini">Mesma linha visual do modelo premium, agora desacoplada da lógica central do sistema.</p>
+        </div>
+        <div class="billing-toggle">
+          <button id="monthlyBtn" class="active" data-billing="monthly">Mensal</button>
+          <button id="yearlyBtn" data-billing="yearly">Anual</button>
+        </div>
+      </div>
+      <div class="plans-grid">
+        <article class="plan-card">
+          <h4>Básico</h4>
+          <p class="muted">30% do sistema</p>
+          <div class="price" id="basicPrice">R$ 39,90 <small>/mês</small></div>
+          <div class="mini-tag">15 dias grátis</div>
+          <ul>
+            <li>Operação essencial</li>
+            <li>Cadastro básico</li>
+            <li>1 dispositivo</li>
+          </ul>
+          <button class="btn btn-primary" data-plan="Básico" data-price="39.90" data-trial="15">Escolher Básico</button>
+        </article>
+        <article class="plan-card featured">
+          <span class="plan-badge">Mais vendido</span>
+          <h4>Econômico</h4>
+          <p class="muted">60% do sistema</p>
+          <div class="price" id="ecoPrice">R$ 79,90 <small>/mês</small></div>
+          <div class="mini-tag">8 dias grátis</div>
+          <ul>
+            <li>Mais gestão</li>
+            <li>Relatórios ampliados</li>
+            <li>Mais flexibilidade</li>
+          </ul>
+          <button class="btn btn-primary" data-plan="Econômico" data-price="79.90" data-trial="8">Escolher Econômico</button>
+        </article>
+        <article class="plan-card">
+          <h4>Pró</h4>
+          <p class="muted">90% do sistema</p>
+          <div class="price" id="proPrice">R$ 129,90 <small>/mês</small></div>
+          <div class="mini-tag">3 dias grátis</div>
+          <ul>
+            <li>Maior personalização</li>
+            <li>Operação robusta</li>
+            <li>Prioridade de expansão</li>
+          </ul>
+          <button class="btn btn-primary" data-plan="Pró" data-price="129.90" data-trial="3">Escolher Pró</button>
+        </article>
+      </div>
+    </section>
+  </section>
+
+  <section id="appRoot" class="app-shell hidden">
+    <header class="topbar">
+      <div class="brand-line">
+        <div class="logo-badge">G</div>
+        <div>
+          <strong>Gamby Fluxo Caixa Pro</strong>
+          <div id="welcomeRole" class="mini">Painel interno</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span id="profileBadge" class="pill">Perfil</span>
+        <span id="sessionStatus" class="pill">Sessão ativa</span>
+        <button class="btn btn-ghost" data-action="logout">Sair</button>
+      </div>
+    </header>
+
+    <div class="app-layout">
+      <aside class="sidebar">
+        <button class="nav-btn active" data-page="dashboard">Dashboard</button>
+        <button class="nav-btn" data-page="produtos">Produtos</button>
+        <button class="nav-btn" data-page="pdv">PDV / Caixa</button>
+        <button class="nav-btn financial-only" data-page="financeiro">Financeiro</button>
+        <button class="nav-btn" data-page="historico">Histórico</button>
+        <button class="nav-btn financial-only" data-page="relatorios">Relatórios</button>
+        <button class="nav-btn admin-or-dev marketplace-only" data-page="marketplace">Marketplace</button>
+        <button class="nav-btn admin-or-dev" data-page="usuarios">Usuários</button>
+        <button class="nav-btn admin-or-dev settings-only" data-page="configuracoes">Configurações</button>
+        <button class="nav-btn dev-only" data-page="desenvolvedora">Painel Desenvolvedora</button>
+      </aside>
+
+      <main class="content-area">
+        <section class="page" data-page-content="dashboard">
+          <div class="page-head"><div><h2>Dashboard</h2><p class="mini">Etapa 6: pendências do sistema antigo trazidas para a base modular.</p></div></div>
+          <div class="dashboard-grid">
+            <article class="panel metric-card"><span class="mini">Módulos separados</span><strong>16</strong></article>
+            <article class="panel metric-card"><span class="mini">Produtos cadastrados</span><strong id="metricProducts">0</strong></article>
+            <article class="panel metric-card"><span class="mini">Itens em estoque</span><strong id="metricStockItems">0</strong></article>
+            <article class="panel metric-card"><span class="mini">Perfil atual</span><strong id="metricProfile">—</strong></article>
+            <article class="panel metric-card"><span class="mini">Vendas do dia</span><strong id="metricSales">R$ 0,00</strong></article>
+            <article class="panel metric-card"><span class="mini">Saldo atual</span><strong id="metricBalance">R$ 0,00</strong></article>
+            <article class="panel metric-card"><span class="mini">Sessão de caixa</span><strong id="metricCashSession">Fechado</strong></article>
+          </div>
+          <div class="products-layout" style="margin-top:18px;">
+            <article class="panel">
+              <h3>Estoque baixo</h3>
+              <div class="table-wrap"><table><thead><tr><th>Produto</th><th>Atual</th><th>Mínimo</th></tr></thead><tbody id="lowStockTableBody"></tbody></table></div>
+            </article>
+            <article class="panel">
+              <h3>Sessão do caixa</h3>
+              <div id="cashSessionBox"></div>
+            </article>
+          <article class="panel dev-only"><h3>Preparação para backend</h3><p class="mini">Configure a API base, endpoints e estratégia de sincronização. Esta etapa mantém fallback local para não quebrar a operação enquanto o backend é implantado.</p><div class="field-grid two"><label class="mini"><input id="backendEnabled" type="checkbox" /> Ativar modo backend</label><div class="field-group"><label>API Base URL</label><input id="backendApiBaseUrl" class="field" placeholder="https://api.seudominio.com" /></div><div class="field-group"><label>Timeout (ms)</label><input id="backendTimeoutMs" class="field" type="number" min="1000" step="1000" /></div><div class="field-group"><label>Tenant header</label><input id="backendTenantHeader" class="field" placeholder="X-Tenant-Id" /></div><div class="field-group"><label>Tenant ID</label><input id="backendTenantId" class="field" placeholder="empresa-001" /></div><div class="field-group"><label>Estratégia</label><select id="backendSyncStrategy" class="field"><option value="fallback-local">Fallback local</option><option value="backend-preferred">Preferir backend</option><option value="local-only">Somente local</option></select></div><div class="field-group"><label>Endpoint Auth</label><input id="endpointAuth" class="field" placeholder="/auth" /></div><div class="field-group"><label>Endpoint Products</label><input id="endpointProducts" class="field" placeholder="/products" /></div><div class="field-group"><label>Endpoint Sales</label><input id="endpointSales" class="field" placeholder="/sales" /></div><div class="field-group"><label>Endpoint Payments</label><input id="endpointPayments" class="field" placeholder="/payments" /></div><div class="field-group"><label>Endpoint Companies</label><input id="endpointCompanies" class="field" placeholder="/companies" /></div></div><div class="hero-actions compact"><button id="saveBackendSettingsBtn" class="btn btn-primary">Salvar backend</button><button id="runBackendHealthcheckBtn" class="btn btn-ghost">Testar conexão</button></div><div id="backendStatusBox" class="notice">Backend ainda não configurado.</div><ul id="backendChecklist" class="mini" style="margin-top:14px;padding-left:18px;"></ul></article></div>
+        </section>
+
+        <section class="page hidden" data-page-content="produtos">
+          <div class="page-head"><div><h2>Produtos</h2><p class="mini">Cadastro, ajuste rápido, remoção dedicada e backup/restauração.</p></div></div>
+          <div class="products-layout">
+            <article class="panel product-manage-only">
+              <h3>Cadastrar produto</h3>
+              <div class="field-grid two">
+                <div class="field-group"><label>Nome do produto</label><input id="productName" class="field" placeholder="Ex.: Lápis Preto HB" /></div>
+                <div class="field-group"><label>Código</label><input id="productCode" class="field" placeholder="ESC025" /></div>
+                <div class="field-group"><label>Categoria</label><input id="productCategory" class="field" placeholder="Escolar" /></div>
+                <div class="field-group"><label>Preço</label><input id="productPrice" class="field" type="number" step="0.01" placeholder="0,00" /></div>
+                <div class="field-group"><label>Estoque</label><input id="productStock" class="field" type="number" placeholder="0" /></div>
+                <div class="field-group"><label>Estoque mínimo</label><input id="productMinStock" class="field" type="number" min="0" placeholder="1" /></div>
+              </div>
+              <div class="hero-actions compact"><button id="saveProductBtn" class="btn btn-primary">Salvar produto</button><button id="clearProductBtn" class="btn btn-ghost">Limpar</button></div>
+              <hr style="border-color:var(--line);margin:18px 0;">
+              <h3>Remover produto</h3>
+              <div class="field-grid two">
+                <div class="field-group"><label>Selecione o produto</label><select id="removeProductSelect" class="field"></select></div>
+              </div>
+              <button id="removeProductBySelectBtn" class="btn btn-ghost">Remover selecionado</button>
+            </article>
+            <article class="panel">
+              <div class="section-head compact-head">
+                <div><h3>Lista de produtos</h3><p class="mini">Ajuste rápido de estoque por linha e alertas de mínimo.</p></div>
+                <div class="hero-actions compact backup-only">
+                  <button id="exportProductsBtn" class="btn btn-primary">Exportar backup</button>
+                  <label class="btn btn-ghost" for="importProductsFile">Importar backup</label>
+                  <input id="importProductsFile" type="file" accept="application/json" class="hidden" />
+                  <button id="restoreDefaultsBtn" class="btn btn-ghost">Restaurar padrão</button>
+                </div>
+              </div>
+              <div class="table-wrap"><table><thead><tr><th>#</th><th>Produto</th><th>Código</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th class="product-manage-only">Ação</th></tr></thead><tbody id="productsTableBody"></tbody></table></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="page hidden" data-page-content="pdv">
+          <div class="page-head"><div><h2>PDV / Caixa</h2><p class="mini">Venda, cancelamento de venda e sessão detalhada do expediente.</p></div></div>
+          <div class="products-layout">
+            <article class="panel">
+              <h3>Abertura e fechamento do caixa</h3>
+              <div class="field-grid two"><div class="field-group"><label>Valor de abertura</label><input id="openingAmount" class="field" type="number" step="0.01" placeholder="0,00" /></div></div>
+              <div class="hero-actions compact"><button id="openCashBtn" class="btn btn-primary">Abrir caixa</button><button id="closeCashBtn" class="btn btn-ghost">Fechar caixa</button><button id="resetCashBtn" class="btn btn-ghost dev-only">Resetar sessão</button></div>
+              <div id="cashSessionBoxDuplicate" class="mini" style="display:none"></div>
+            </article>
+            <article class="panel">
+              <h3>Lançar venda</h3>
+              <div class="field-grid two">
+                <div class="field-group"><label>Código do produto</label><input id="saleProductCode" class="field" placeholder="Digite o código do produto" /></div>
+                <div class="field-group"><label>Quantidade</label><input id="saleQuantity" class="field" type="number" min="1" value="1" /></div>
+                <div class="field-group"><label>Forma de pagamento</label><select id="salePaymentMethod" class="field"><option>Dinheiro</option><option>Cartão</option><option>Pix</option><option>Boleto</option></select></div>
+                <div class="field-group"><label>Valor pago</label><input id="amountPaid" class="field" type="number" step="0.01" placeholder="0,00" /></div>
+              </div>
+              <div class="hero-actions compact"><button id="addToCartBtn" class="btn btn-primary">Adicionar item</button><button id="finalizeSaleBtn" class="btn btn-ghost">Finalizar venda</button></div>
+              <div class="notice">Troco previsto: <strong id="changePreview">R$ 0,00</strong></div>
+              <div class="table-wrap" style="margin-top:16px;"><table><thead><tr><th>Produto</th><th>Preço</th><th>Qtd</th><th>Total</th><th>Ação</th></tr></thead><tbody id="cartTableBody"></tbody></table></div>
+              <div class="section-head compact-head" style="margin-top:12px;"><div><h3>Total da venda</h3></div><strong id="pdvTotal">R$ 0,00</strong></div>
+            </article>
+          </div>
+          <div class="panel" style="margin-top:18px;"><h3>Vendas recentes</h3><div class="table-wrap"><table><thead><tr><th>Data</th><th>Itens</th><th>Pagamento</th><th>Total</th><th>Ação</th></tr></thead><tbody id="recentSalesTableBody"></tbody></table></div></div>
+        </section>
+
+        <section class="page hidden financial-only" data-page-content="financeiro"><div class="page-head"><div><h2>Financeiro</h2><p class="mini">Resumo e movimentações financeiras do período.</p></div></div><div id="financeSummary"></div></section>
+        <section class="page hidden" data-page-content="historico"><div class="page-head"><div><h2>Histórico</h2><p class="mini">Movimentações operacionais e financeiras do sistema.</p></div></div><div class="panel"><div class="table-wrap"><table><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Valor</th></tr></thead><tbody id="historyTableBody"></tbody></table></div></div></section>
+        <section class="page hidden financial-only" data-page-content="relatorios"><div class="page-head"><div><h2>Relatórios</h2><p class="mini">Impressão do relatório diário e exportação em Word.</p></div><div class="hero-actions compact"><button id="printDailyReportBtn" class="btn btn-primary">Imprimir relatório diário</button><button id="exportDailyReportWordBtn" class="btn btn-ghost">Exportar Word</button></div></div><div id="reportsSummary"></div></section>
+        <section class="page hidden admin-or-dev marketplace-only" data-page-content="marketplace"><div class="page-head"><div><h2>Integração Marketplace</h2><p class="mini">Vincule canais e simule vendas online com baixa automática de estoque.</p></div></div><div class="products-layout"><article class="panel"><h3>Canais conectados</h3><div class="field-grid two"><div class="field-group"><label>Nome do canal</label><input id="marketplaceChannelName" class="field" placeholder="Ex.: Shopee" /></div></div><div class="hero-actions compact"><button id="addMarketplaceChannelBtn" class="btn btn-primary">Vincular canal</button></div><ul id="marketplaceChannelsList" class="mini" style="margin-top:14px;padding-left:18px;"></ul></article><article class="panel"><h3>Simular venda online</h3><div class="field-grid two"><div class="field-group"><label>Canal</label><select id="marketplaceChannelSelect" class="field"></select></div><div class="field-group"><label>Código do produto</label><input id="marketplaceProductCode" class="field" placeholder="Código" /></div><div class="field-group"><label>Quantidade</label><input id="marketplaceQuantity" class="field" type="number" min="1" value="1" /></div></div><div class="hero-actions compact"><button id="simulateMarketplaceSaleBtn" class="btn btn-primary">Lançar venda online</button></div></article></div><div class="panel" style="margin-top:18px;"><h3>Pedidos online</h3><div class="table-wrap"><table><thead><tr><th>Data</th><th>Canal</th><th>Produto</th><th>Qtd</th><th>Total</th></tr></thead><tbody id="marketplaceOrdersTableBody"></tbody></table></div></div></section>
+        <section class="page hidden admin-or-dev" data-page-content="usuarios"><div class="page-head"><div><h2>Usuários internos</h2><p class="mini">Criar e remover usuários internos sem excluir o usuário logado.</p></div></div><div class="products-layout"><article class="panel"><h3>Novo usuário interno</h3><div class="field-grid two"><div class="field-group"><label>Usuário</label><input id="newInternalUsername" class="field" placeholder="novo.usuario" /></div><div class="field-group"><label>Senha</label><input id="newInternalPassword" class="field" placeholder="Senha" /></div><div class="field-group"><label>Perfil</label><select id="newInternalRole" class="field"><option value="operador">Operador</option><option value="administrador">Administradora</option><option value="desenvolvedora">Desenvolvedora</option></select></div></div><button id="addInternalUserBtn" class="btn btn-primary">Criar usuário</button></article><article class="panel"><h3>Usuários cadastrados</h3><div class="table-wrap"><table><thead><tr><th>Usuário</th><th>Perfil</th><th>Ação</th></tr></thead><tbody id="internalUsersTableBody"></tbody></table></div></article></div></section>
+        <section class="page hidden admin-or-dev settings-only" data-page-content="configuracoes"><div class="page-head"><div><h2>Configurações da empresa</h2><p class="mini">Dados usados em relatórios, impressão e estrutura interna.</p></div></div><div class="products-layout"><article class="panel"><h3>Dados da empresa</h3><div class="field-grid two"><div class="field-group"><label>Razão social</label><input id="companyName" class="field" /></div><div class="field-group"><label>Nome fantasia</label><input id="tradeName" class="field" /></div><div class="field-group"><label>CNPJ</label><input id="companyCnpj" class="field" /></div><div class="field-group"><label>Telefone</label><input id="companyPhone" class="field" /></div><div class="field-group"><label>E-mail</label><input id="companyEmail" class="field" /></div><div class="field-group"><label>Endereço</label><input id="companyAddress" class="field" /></div><div class="field-group" style="grid-column:1/-1;"><label>Rodapé dos relatórios</label><textarea id="companyFooter" class="field"></textarea></div></div><div class="hero-actions compact"><button id="saveCompanySettingsBtn" class="btn btn-primary">Salvar configurações</button></div><div id="companySettingsStatus" class="notice">Configurações da empresa ainda não salvas nesta sessão.</div></article><article class="panel"><h3>Autotestes de consistência</h3><p class="mini">Verificação rápida da base modular e dos módulos essenciais.</p><div class="hero-actions compact"><button id="runSelfTestsBtn" class="btn btn-ghost">Executar autotestes</button></div><ul id="selfTestsList" class="mini" style="margin-top:14px;padding-left:18px;"></ul></article></div></section>
+        <section class="page hidden dev-only" data-page-content="desenvolvedora">
+          <div class="page-head"><div><h2>Painel Desenvolvedora</h2><p class="mini">Área matriz para pagamentos, dispositivos e suporte multiempresa.</p></div></div>
+          <div class="products-layout"><article class="panel payments-only"><h3>Configurações de pagamento</h3><div class="field-grid two"><label class="mini"><input id="paymentMethodCard" type="checkbox" /> Cartão</label><label class="mini"><input id="paymentMethodPix" type="checkbox" /> Pix</label><label class="mini"><input id="paymentMethodBoleto" type="checkbox" /> Boleto</label><label class="mini"><input id="paymentMethodCash" type="checkbox" /> Dinheiro</label><div class="field-group"><label>Chave Pix</label><input id="paymentPixKey" class="field" placeholder="sua-chave-pix" /></div><div class="field-group"><label>Emissor de boleto</label><input id="paymentBoletoIssuer" class="field" placeholder="Banco ou gateway" /></div><div class="field-group"><label>Dias de lembrete</label><input id="paymentReminderDays" class="field" type="number" min="1" value="1" /></div><div class="field-group"><label class="mini"><input id="paymentAutoReminder" type="checkbox" /> Enviar lembrete automático</label><label class="mini"><input id="paymentAutoDebit" type="checkbox" /> Débito automático após teste</label></div></div><div class="hero-actions compact"><button id="savePaymentSettingsBtn" class="btn btn-primary">Salvar pagamentos</button></div><div id="paymentSettingsStatus" class="notice">Configurações da matriz de cobrança.</div><div id="paymentReminderPreview" class="mini" style="margin-top:10px;"></div></article><article class="panel payments-only"><h3>Liberação de dispositivos</h3><p class="mini">Gere códigos para liberar acessos adicionais em instalações administradas pela matriz.</p><div class="hero-actions compact"><button id="generateDeviceCodeBtn" class="btn btn-primary">Gerar código</button></div><ul id="deviceCodeList" class="mini" style="margin-top:14px; padding-left:18px;"></ul></article></div>
+        </section>
+      </main>
+    </div>
+  </section>
+<div id="registerOverlay" class="overlay hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <span class="tag tag-primary">Cadastro em etapas</span>
+          <h3>Criar conta no Gamby</h3>
+          <p class="mini">Etapa 1 separa autenticação e planos do restante do sistema.</p>
+        </div>
+        <button class="close-btn" data-action="close-register">✕</button>
+      </div>
+
+      <div class="status-chip">Etapa atual: <strong id="stageLabel">Cadastro</strong></div>
+
+      <section id="stage-register" class="auth-stage active">
+        <div class="modal-grid">
+          <div class="panel">
+            <h4>Dados do cadastro</h4>
+            <div class="field-grid two">
+              <div class="field-group"><label>Nome completo</label><input id="regName" class="field" /></div>
+              <div class="field-group"><label>Empresa</label><input id="regCompany" class="field" /></div>
+              <div class="field-group"><label>E-mail</label><input id="regEmail" class="field" /></div>
+              <div class="field-group"><label>Telefone</label><input id="regPhone" class="field" /></div>
+              <div class="field-group"><label>Senha</label><input id="regPassword" class="field" type="password" /></div>
+              <div class="field-group"><label>Confirmar senha</label><input id="regPasswordConfirm" class="field" type="password" /></div>
+            </div>
+            <div class="hero-actions compact"><button class="btn btn-primary" data-action="go-verify">Prosseguir</button></div>
+          </div>
+          <div class="panel">
+            <h4>Resumo</h4>
+            <div class="timeline-item">Cadastro → verificação → plano → pagamento.</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="stage-verify" class="auth-stage">
+        <div class="modal-grid">
+          <div class="panel">
+            <h4>Verificação por e-mail</h4>
+            <div class="field-grid two">
+              <div class="field-group"><label>E-mail</label><input id="verifyEmailDisplay" class="field" readonly /></div>
+              <div class="field-group"><label>Código</label><input id="verificationCode" class="field" placeholder="000000" /></div>
+            </div>
+            <div class="hero-actions compact">
+              <button class="btn btn-primary" data-action="confirm-verify">Confirmar e-mail</button>
+              <button class="btn btn-ghost" data-action="resend-code">Reenviar código</button>
+            </div>
+          </div>
+          <div class="panel"><p class="mini">Envio real depende de backend com Brevo/SMTP.</p></div>
+        </div>
+      </section>
+
+      <section id="stage-plan" class="auth-stage">
+        <div class="plans-grid modal-plans">
+          <article class="plan-card"><h4>Básico</h4><div class="price">R$ 39,90</div><div class="mini-tag">15 dias grátis</div><button class="btn btn-primary" data-plan="Básico" data-price="39.90" data-trial="15">Selecionar</button></article>
+          <article class="plan-card featured"><h4>Econômico</h4><div class="price">R$ 79,90</div><div class="mini-tag">8 dias grátis</div><button class="btn btn-primary" data-plan="Econômico" data-price="79.90" data-trial="8">Selecionar</button></article>
+          <article class="plan-card"><h4>Pró</h4><div class="price">R$ 129,90</div><div class="mini-tag">3 dias grátis</div><button class="btn btn-primary" data-plan="Pró" data-price="129.90" data-trial="3">Selecionar</button></article>
+        </div>
+      </section>
+
+      <section id="stage-payment" class="auth-stage">
+        <div class="modal-grid">
+          <div class="panel">
+            <h4>Forma de pagamento</h4>
+            <div id="selectedPlanSummary" class="notice">Nenhum plano selecionado ainda.</div>
+            <div class="payment-grid">
+              <div class="payment-option active" data-payment-method="Cartão">Cartão</div>
+              <div class="payment-option" data-payment-method="Pix">Pix</div>
+              <div class="payment-option" data-payment-method="Boleto">Boleto</div>
+              <div class="payment-option" data-payment-method="Dinheiro">Dinheiro</div>
+            </div>
+            <div class="field-grid two">
+              <div class="field-group"><label>Titular</label><input id="cardHolder" class="field" /></div>
+              <div class="field-group"><label>Cartão</label><input id="cardNumber" class="field" /></div>
+            </div>
+            <div class="hero-actions compact"><button class="btn btn-primary" data-action="finish-register">Concluir cadastro</button></div>
+          </div>
+          <div class="panel"><p class="mini">A cobrança é estrutural nesta fase; integração real vem depois no backend.</p></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script type="module" src="assets/js/app.js"></script>
+</body>
+</html>
