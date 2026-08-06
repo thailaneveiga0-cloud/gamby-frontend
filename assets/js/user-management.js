@@ -6,7 +6,7 @@ import { listUsersService, createUserService, deleteUserService } from './servic
 export async function initInternalUsers() {
   const backendUsers = await listUsersService().catch(() => null);
   if (Array.isArray(backendUsers) && backendUsers.length) {
-    state.internalUsers = backendUsers.map(user => ({ id: user.id, username: user.email, password: '••••••', role: user.role }));
+    state.internalUsers = backendUsers.map(user => ({ id: user.id, username: user.email, password: '••••••', role: user.role, companyId: user.companyId || state.currentUser?.companyId, subscriptionStatus: user.subscriptionStatus || state.currentUser?.subscriptionStatus }));
   } else {
     state.internalUsers = load(KEYS.internalUsers, DEFAULT_INTERNAL_USERS);
   }
@@ -32,7 +32,9 @@ export async function addInternalUser() {
     isActive: true
   }).catch(() => null);
 
-  state.internalUsers.push(backendUser ? { id: backendUser.id, username: backendUser.email, password: '••••••', role: backendUser.role } : { username, password, role });
+  state.internalUsers.push(backendUser
+    ? { id: backendUser.id, username: backendUser.email, password: '••••••', role: backendUser.role, companyId: backendUser.companyId || state.currentUser?.companyId, subscriptionStatus: backendUser.subscriptionStatus || state.currentUser?.subscriptionStatus }
+    : { username, password, role, companyId: state.currentUser?.companyId || 'local-company', subscriptionStatus: state.currentUser?.subscriptionStatus || 'active' });
   persist();
   renderInternalUsers();
   document.getElementById('newInternalUsername').value='';

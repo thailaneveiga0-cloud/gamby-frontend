@@ -13,6 +13,7 @@ import { initInternalUsers, bindUserManagementActions, renderInternalUsers } fro
 import { initMarketplace, bindMarketplaceActions, renderMarketplace } from './marketplace.js';
 import { initSettings, bindSettingsActions, renderSettings, renderSelfTests } from './settings.js';
 import { initBackendStatus, bindBackendStatusActions, renderBackendStatus } from './backend-status.js';
+import { initDevelopmentConfig, bindDevelopmentConfigActions, renderDevelopmentConfig } from './development-config.js';
 
 async function refreshProtectedAreas() {
   if (!state.currentUser) return;
@@ -28,13 +29,14 @@ async function refreshProtectedAreas() {
   renderSettings();
   renderSelfTests();
   renderBackendStatus();
+  renderDevelopmentConfig();
 }
 
 function bindAuthActions() {
   document.querySelector('[data-action="focus-login"]')?.addEventListener('click', () => document.getElementById('loginUser')?.focus());
   document.querySelectorAll('[data-action="open-register"]').forEach((btn) => btn.addEventListener('click', openRegisterModal));
   document.querySelector('[data-action="close-register"]')?.addEventListener('click', closeRegisterModal);
-  document.querySelector('[data-action="login"]')?.addEventListener('click', async () => { await login(); await refreshProtectedAreas(); });
+  document.querySelector('[data-action="login"]')?.addEventListener('click', async () => { if (await login()) await refreshProtectedAreas(); });
   document.querySelector('[data-action="logout"]')?.addEventListener('click', logout);
   document.querySelector('[data-action="go-verify"]')?.addEventListener('click', goToEmailVerification);
   document.querySelector('[data-action="resend-code"]')?.addEventListener('click', resendVerificationCode);
@@ -42,7 +44,7 @@ function bindAuthActions() {
   document.querySelector('[data-action="finish-register"]')?.addEventListener('click', finishRegistration);
   document.querySelectorAll('[data-plan]').forEach((btn) => btn.addEventListener('click', () => selectPlan(btn.dataset.plan, btn.dataset.price, btn.dataset.trial)));
   document.getElementById('loginPass')?.addEventListener('keydown', async (event) => {
-    if (event.key === 'Enter') { event.preventDefault(); await login(); await refreshProtectedAreas(); }
+    if (event.key === 'Enter') { event.preventDefault(); if (await login()) await refreshProtectedAreas(); }
   });
 }
 
@@ -53,7 +55,8 @@ function bindOverlayClose() {
 }
 
 async function init() {
-  bindAuthActions(); bindOverlayClose(); bindPaymentActions(); setupNavigation(); bindProductActions(); bindBackupActions(); bindPDVActions(); bindCashSessionActions(); bindReportActions(); bindUserManagementActions(); bindMarketplaceActions(); bindSettingsActions(); bindBackendStatusActions();
+  initDevelopmentConfig();
+  bindAuthActions(); bindOverlayClose(); bindPaymentActions(); setupNavigation(); bindProductActions(); bindBackupActions(); bindPDVActions(); bindCashSessionActions(); bindReportActions(); bindUserManagementActions(); bindMarketplaceActions(); bindSettingsActions(); bindBackendStatusActions(); bindDevelopmentConfigActions();
   initBackendStatus();
   await loadPaymentSettings();
   await initProducts();
@@ -67,7 +70,7 @@ async function init() {
   renderReports();
 
   const restored = tryRestoreSession();
-  if (restored && state.currentUser) { applyAuthenticatedLayout(state.currentUser); await refreshProtectedAreas(); }
+  if (restored && state.currentUser) await refreshProtectedAreas();
 }
 
 init();

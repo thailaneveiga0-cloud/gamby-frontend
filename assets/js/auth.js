@@ -5,6 +5,8 @@ import { applyAuthenticatedLayout, applyLoggedOutLayout, setMessage, setStage, t
 import { updatePlanSummary } from './payments.js';
 import { addDays, formatDateBR, normalizeString } from './utils.js';
 import { DEFAULT_INTERNAL_USERS } from './state.js';
+import { validateAccess } from './access-control.js';
+import { saveBackendConfig } from './backend-config.js';
 
 function getAuthUsers() {
   return load(KEYS.authUsers, []);
@@ -24,14 +26,19 @@ export function tryRestoreSession() {
   if (!session) return false;
   const hasInternal = (state.internalUsers || DEFAULT_INTERNAL_USERS).some((u) => u.username === session.username && u.role === session.role);
   const hasAuth = getAuthUsers().some((u) => u.email === session.username);
-  const hasBackendSession = Boolean(session.token && session.companyId);
+  const hasBackendSession = Boolean(session.token && (session.companyId || session.role === 'desenvolvedora'));
   if (!hasInternal && !hasAuth && !hasBackendSession) {
     remove(KEYS.session);
     return false;
   }
-  state.currentUser = session;
-  if (session.companyId) state.backend.tenantId = session.companyId;
-  applyAuthenticatedLayout(session);
+  const access = validateAccess(session, state.development);
+  if (!access.ok) {
+    remove(KEYS.session);
+    return false;
+  }
+  state.currentUser = access.user;
+  if (access.user.companyId) state.backend.tenantId = access.user.companyId;
+  applyAuthenticatedLayout(access.user);
   return true;
 }
 
@@ -44,12 +51,24 @@ export async function login() {
       setMessage('Login não encontrado. Verifique os dados ou faça o cadastro.', true);
       return;
     }
-    state.currentUser = user;
+    const access = validateAccess(user, state.development);
+    if (!access.ok) {
+      state.currentUser = null;
+      setMessage(access.message, true);
+      return false;
+    }
+    state.currentUser = access.user;
+    if (state.currentUser.companyId) {
+      state.backend.tenantId = state.currentUser.companyId;
+      saveBackendConfig({ tenantId: state.currentUser.companyId });
+    }
     save(KEYS.session, state.currentUser);
     applyAuthenticatedLayout(state.currentUser);
     setMessage(`Acesso liberado para ${state.currentUser.username}.`);
+    return true;
   } catch (error) {
     setMessage(error.message || 'Falha ao autenticar.', true);
+    return false;
   }
 }
 

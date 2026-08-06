@@ -36,6 +36,13 @@ export function applyRoleVisibility(role) {
   document.querySelectorAll('.settings-only').forEach((el) => el.classList.toggle('hidden', !config.settings));
 }
 
+export function applyPagePermissions(user) {
+  const allowedPages = Array.isArray(user?.allowedPages) ? user.allowedPages : [];
+  document.querySelectorAll('.nav-btn[data-page]').forEach((button) => {
+    button.classList.toggle('hidden', !allowedPages.includes(button.dataset.page));
+  });
+}
+
 export function applyAuthenticatedLayout(user) {
   document.getElementById('authRoot')?.classList.add('hidden');
   document.getElementById('appRoot')?.classList.remove('hidden');
@@ -44,7 +51,8 @@ export function applyAuthenticatedLayout(user) {
   document.getElementById('metricProfile').textContent = getRoleLabel(user.role);
   document.getElementById('sessionStatus').textContent = user.company ? user.company : 'Sessão ativa';
   applyRoleVisibility(user.role);
-  activateDefaultPage();
+  applyPagePermissions(user);
+  activateDefaultPage(user);
 }
 
 export function applyLoggedOutLayout() {
@@ -53,17 +61,19 @@ export function applyLoggedOutLayout() {
   toggleRegister(false);
 }
 
-export function activateDefaultPage() {
-  const firstButton = document.querySelector('.nav-btn[data-page="dashboard"]');
+export function activateDefaultPage(user = null) {
+  const defaultPage = user?.role === 'operador' ? 'pdv' : (user?.allowedPages?.[0] || 'dashboard');
+  const firstButton = document.querySelector(`.nav-btn[data-page="${defaultPage}"]:not(.hidden)`);
   if (!firstButton) return;
   document.querySelectorAll('.nav-btn').forEach((btn) => btn.classList.remove('active'));
   firstButton.classList.add('active');
-  document.querySelectorAll('[data-page-content]').forEach((section) => { section.classList.toggle('hidden', section.dataset.pageContent !== 'dashboard'); });
+  document.querySelectorAll('[data-page-content]').forEach((section) => { section.classList.toggle('hidden', section.dataset.pageContent !== defaultPage); });
 }
 
 export function setupNavigation() {
   document.querySelectorAll('.nav-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
+      if (btn.classList.contains('hidden')) return;
       const page = btn.dataset.page;
       document.querySelectorAll('.nav-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');

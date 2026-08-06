@@ -1,6 +1,6 @@
-import { state } from '../state.js';
+import { DEFAULT_INTERNAL_USERS, state } from '../state.js';
 import { KEYS, load, save } from '../storage.js';
-import { buildEndpoint, isBackendReady, saveBackendConfig } from '../backend-config.js';
+import { buildEndpoint, isBackendReady } from '../backend-config.js';
 import { httpRequest } from '../http.js';
 
 function getLocalAuthUsers() { return load(KEYS.authUsers, []); }
@@ -19,6 +19,11 @@ function paymentMethodCode(value = '') {
 }
 
 export async function authenticateUser(loginValue, password) {
+  const localDeveloper = DEFAULT_INTERNAL_USERS.find((user) => user.username === loginValue && user.password === password && user.role === 'desenvolvedora');
+  if (state.development?.enabled && state.development?.allowLocalDeveloperLogin && localDeveloper) {
+    return { username: localDeveloper.username, role: 'desenvolvedora', authenticationSource: 'local-development' };
+  }
+
   if (isBackendReady()) {
     const payload = await httpRequest(buildEndpoint('auth', 'login'), {
       method: 'POST',
@@ -32,21 +37,29 @@ export async function authenticateUser(loginValue, password) {
       role: payload.user?.role || 'administrador',
       company: payload.company?.tradeName || '',
       companyId: payload.company?.id || payload.user?.companyId || '',
+      tenant: payload.tenant,
+      subscription: payload.company?.subscription || payload.subscription,
+      subscriptionStatus: payload.company?.subscription?.status || payload.subscription?.status || payload.subscriptionStatus || '',
+      permissions: payload.user?.permissions || payload.permissions,
+      allowedPages: payload.user?.allowedPages || payload.allowedPages || (Array.isArray(payload.user?.permissions) ? payload.user.permissions : undefined),
       token: payload.token,
-      refreshToken: payload.refreshToken
+      refreshToken: payload.refreshToken,
+      authenticationSource: 'backend'
     };
-
-    state.currentUser = session;
-    if (session.companyId) {
-      state.backend.tenantId = session.companyId;
-      saveBackendConfig({ tenantId: session.companyId });
-    }
     return session;
   }
 
   const authUser = getLocalAuthUsers().find((u) => u.email === loginValue && u.password === password);
   const internalUser = (state.internalUsers || []).find((u) => u.username === loginValue && u.password === password);
-  return authUser ? { username: authUser.email, email: authUser.email, role: 'administrador', company: authUser.company, companyId: authUser.companyId || '' } : internalUser ? { username: internalUser.username, role: internalUser.role } : null;
+  return authUser ? {
+    username: authUser.email,
+    email: authUser.email,
+    role: authUser.role || 'administrador',
+    company: authUser.company,
+    companyId: authUser.companyId || `local-company-${authUser.id}`,
+    subscriptionStatus: authUser.subscriptionStatus || 'trial',
+    authenticationSource: 'local'
+  } : internalUser ? { ...internalUser, password: undefined, authenticationSource: 'local' } : null;
 }
 
 export async function registerUser(registrationData, paymentPayload = {}) {
@@ -67,7 +80,8 @@ export async function registerUser(registrationData, paymentPayload = {}) {
   }
   const users = getLocalAuthUsers();
   if (users.find((u) => u.email === registrationData.email)) throw new Error('Já existe um cadastro com esse e-mail.');
-  const user = { id: Date.now(), ...registrationData, ...paymentPayload };
+  const id = Date.now();
+  const user = { id, ...registrationData, ...paymentPayload, role: 'administrador', companyId: `local-company-${id}`, subscriptionStatus: 'trial' };
   users.push(user);
   saveLocalAuthUsers(users);
   return user;

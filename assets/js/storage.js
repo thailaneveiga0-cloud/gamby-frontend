@@ -9,7 +9,8 @@ export const KEYS = {
   companySettings: 'gamby_company_settings_modular',
   marketplace: 'gamby_marketplace_modular',
   history: 'gamby_history_modular',
-  backendConfig: 'gamby_backend_config_modular'
+  backendConfig: 'gamby_backend_config_modular',
+  developmentConfig: 'gamby_development_config_modular'
 };
 
 export function load(key, fallback) {

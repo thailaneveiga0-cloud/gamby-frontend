@@ -1,7 +1,8 @@
 export const DEFAULT_INTERNAL_USERS = [
   { username: 'dev.gamby', password: 'GambyDev@2026', role: 'desenvolvedora' },
-  { username: 'admin', password: '1234', role: 'administrador' },
-  { username: 'operador', password: '1234', role: 'operador' }
+  { username: 'admin', password: '1234', role: 'administrador', companyId: 'local-company', subscriptionStatus: 'active' },
+  { username: 'gerente', password: '1234', role: 'gerente', companyId: 'local-company', subscriptionStatus: 'active' },
+  { username: 'operador', password: '1234', role: 'operador', companyId: 'local-company', subscriptionStatus: 'active' }
 ];
 
 export const DEFAULT_COMPANY_SETTINGS = {
@@ -16,6 +17,13 @@ export const DEFAULT_COMPANY_SETTINGS = {
 
 export const state = {
   currentUser: null,
+
+  development: {
+    enabled: true,
+    allowLocalDeveloperLogin: true,
+    simulateSubscription: false,
+    simulatedSubscriptionStatus: 'active'
+  },
 
   backend: {
     enabled: false,
