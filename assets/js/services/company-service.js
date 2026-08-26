@@ -30,13 +30,13 @@ function toApi(settings) {
 
 export async function saveCompanySettingsService(settings) {
   if (isBackendReady()) {
-    try {
-      const payload = await httpRequest(buildEndpoint('companies', 'me'), { method: 'PUT', body: JSON.stringify(toApi(settings)) });
-      const normalized = fromApi(payload);
-      save(KEYS.companySettings, normalized);
-      state.companySettings = normalized;
-      return normalized;
-    } catch { /* fallback local */ }
+    // Backend é a fonte da verdade: se o PUT falhar, propaga o erro — nunca
+    // grava localmente como se tivesse persistido no servidor.
+    const payload = await httpRequest(buildEndpoint('companies', 'me'), { method: 'PUT', body: JSON.stringify(toApi(settings)) });
+    const normalized = fromApi(payload);
+    save(KEYS.companySettings, normalized);
+    state.companySettings = normalized;
+    return normalized;
   }
   save(KEYS.companySettings, settings);
   state.companySettings = settings;

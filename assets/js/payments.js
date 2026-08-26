@@ -44,8 +44,15 @@ export async function loadPaymentSettings() {
 }
 
 export async function savePaymentSettings() {
-  await savePaymentSettingsService(state.paymentSettings);
-  setText('paymentSettingsStatus', 'Configurações salvas com sucesso.');
+  try {
+    await savePaymentSettingsService(state.paymentSettings);
+    setText('paymentSettingsStatus', 'Configurações salvas com sucesso.');
+  } catch (err) {
+    setText('paymentSettingsStatus', `Não foi possível salvar: ${err?.message || 'erro ao contatar o servidor.'}`);
+    // Revalida a partir do backend — a tela não deve continuar mostrando o
+    // rascunho não confirmado como se tivesse sido persistido.
+    await loadPaymentSettings();
+  }
 }
 
 export function applyBillingCycle(mode) {

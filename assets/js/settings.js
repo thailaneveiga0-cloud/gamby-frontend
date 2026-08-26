@@ -8,7 +8,7 @@ export async function initSettings() {
 }
 
 export async function saveCompanySettings() {
-  state.companySettings = {
+  const draft = {
     companyName: document.getElementById('companyName')?.value.trim() || '',
     tradeName: document.getElementById('tradeName')?.value.trim() || '',
     cnpj: document.getElementById('companyCnpj')?.value.trim() || '',
@@ -17,9 +17,17 @@ export async function saveCompanySettings() {
     address: document.getElementById('companyAddress')?.value.trim() || '',
     noteFooter: document.getElementById('companyFooter')?.value.trim() || ''
   };
-  await saveCompanySettingsService(state.companySettings);
   const status = document.getElementById('companySettingsStatus');
-  if (status) status.textContent = 'Configurações da empresa salvas com sucesso.';
+  try {
+    const saved = await saveCompanySettingsService(draft);
+    state.companySettings = saved;
+    if (status) status.textContent = 'Configurações da empresa salvas com sucesso.';
+  } catch (err) {
+    if (status) status.textContent = `Não foi possível salvar: ${err?.message || 'erro ao contatar o servidor.'}`;
+    // Revalida a partir do backend — nunca deixar state.companySettings com
+    // o rascunho não confirmado como se tivesse sido persistido.
+    await initSettings();
+  }
 }
 
 export function renderSettings() {

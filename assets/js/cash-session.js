@@ -4,6 +4,7 @@ import { renderFinance, getFinanceSummary } from './finance.js';
 import { renderReports, printDailyReport } from './reports.js';
 import { formatCurrency, formatDateTimeBR, toNumber } from './utils.js';
 import { addHistory } from './history.js';
+import { isBackendReady } from './backend-config.js';
 import { getCurrentCashSessionService, openCashSessionService, closeCashSessionService } from './services/cash-service.js';
 
 function sessionDurationText(startIso) {
@@ -15,6 +16,10 @@ function sessionDurationText(startIso) {
   return `${hours}h ${minutes}min`;
 }
 
+function nullableNumber(value) {
+  return value === null || value === undefined ? null : Number(value);
+}
+
 function mapCashSession(session) {
   if (!session) return null;
   return {
@@ -23,7 +28,12 @@ function mapCashSession(session) {
     openingAmount: Number(session.openingAmount || 0),
     openedAt: session.openedAt,
     closedAt: session.closedAt,
-    closingAmount: Number(session.closingAmount || 0)
+    closingAmount: Number(session.closingAmount || 0),
+    // Calculados no servidor no fechamento (cash.controller.js) — null
+    // enquanto o caixa está aberto ou se o backend não estiver configurado.
+    expectedAmount: nullableNumber(session.expectedAmount),
+    countedAmount: nullableNumber(session.countedAmount),
+    difference: nullableNumber(session.difference)
   };
 }
 
@@ -37,7 +47,8 @@ export async function initCashSession() {
       save(KEYS.cashSession, state.cashSession);
     }
   } catch {
-    /* fallback local */
+    /* leitura: cai pro estado local já carregado acima, não é a operação
+       de escrita que este arquivo precisa proteger */
   }
   renderCashSession();
 }
@@ -45,35 +56,118 @@ export async function initCashSession() {
 export async function openCashSession() {
   if (state.cashSession?.isOpen) return alert('Já existe um caixa aberto.');
   const value = Math.max(0, toNumber(document.getElementById('openingAmount')?.value));
-  let session = { isOpen: true, openingAmount: value, openedAt: new Date().toISOString() };
-  try {
-    const payload = await openCashSessionService({ openingAmount: value, notes: 'Abertura do expediente' });
-    if (payload) session = mapCashSession(payload);
-  } catch {
-    /* fallback local */
+
+  if (!isBackendReady()) {
+    // Modo local explícito (instalação sem backend configurado) — não é uma
+    // falha de rede, é o modo de operação atual; mantém o comportamento
+    // local já existente para esse caso.
+    const session = { isOpen: true, openingAmount: value, openedAt: new Date().toISOString() };
+    state.cashSession = session;
+    save(KEYS.cashSession, session);
+    addHistory('Caixa', 'Caixa aberto', value);
+    renderCashSession(); renderFinance(); renderReports();
+    const openInput = document.getElementById('openingAmount');
+    if (openInput) openInput.value = '';
+    return;
   }
+
+  let payload;
+  try {
+    payload = await openCashSessionService({ openingAmount: value, notes: 'Abertura do expediente' });
+  } catch (err) {
+    alert(`Não foi possível abrir o caixa: ${err?.message || 'erro ao contatar o servidor.'}`);
+    await initCashSession();
+    return;
+  }
+
+  const session = mapCashSession(payload);
   state.cashSession = session;
-  save(KEYS.cashSession, state.cashSession);
+  save(KEYS.cashSession, session);
   addHistory('Caixa', 'Caixa aberto', value);
   renderCashSession(); renderFinance(); renderReports();
+  const openInput = document.getElementById('openingAmount');
+  if (openInput) openInput.value = '';
 }
 
 export async function closeCashSession() {
   if (!state.cashSession?.isOpen) return alert('Nenhum caixa aberto no momento.');
   const summary = getFinanceSummary();
-  const closedAt = new Date().toISOString();
-  let session = { ...state.cashSession, isOpen: false, closedAt, closingAmount: summary.currentBalance };
-  try {
-    const payload = await closeCashSessionService(state.cashSession.id, { closingAmount: summary.currentBalance, notes: 'Fechamento normal' });
-    if (payload) session = mapCashSession(payload);
-  } catch {
-    /* fallback local */
+  const countedInput = document.getElementById('countedAmount')?.value;
+  const countedAmount = countedInput === '' || countedInput === undefined ? null : Math.max(0, toNumber(countedInput));
+
+  if (!isBackendReady()) {
+    // Modo local explícito — sem backend não há como calcular o esperado
+    // no servidor; mantém o comportamento local já existente.
+    const closedAt = new Date().toISOString();
+    const session = { ...state.cashSession, isOpen: false, closedAt, closingAmount: summary.currentBalance, countedAmount, expectedAmount: null, difference: null };
+    state.cashSession = session;
+    save(KEYS.cashSession, session);
+    addHistory('Caixa', 'Caixa fechado', summary.currentBalance);
+    renderCashSession(); renderFinance(); renderReports();
+    printDailyReport();
+    const countedInputEl = document.getElementById('countedAmount');
+    if (countedInputEl) countedInputEl.value = '';
+    return;
   }
+
+  let payload;
+  try {
+    payload = await closeCashSessionService(state.cashSession.id, {
+      closingAmount: summary.currentBalance,
+      countedAmount,
+      notes: 'Fechamento normal'
+    });
+  } catch (err) {
+    // O backend ainda considera o caixa aberto — nunca fechar a sessão na
+    // tela sem confirmação real do servidor. Revalida antes de nova tentativa.
+    alert(`Não foi possível fechar o caixa: ${err?.message || 'erro ao contatar o servidor.'}`);
+    await initCashSession();
+    return;
+  }
+
+  const session = mapCashSession(payload);
   state.cashSession = session;
-  save(KEYS.cashSession, state.cashSession);
+  save(KEYS.cashSession, session);
   addHistory('Caixa', 'Caixa fechado', summary.currentBalance);
   renderCashSession(); renderFinance(); renderReports();
   printDailyReport();
+  const countedInputEl = document.getElementById('countedAmount');
+  if (countedInputEl) countedInputEl.value = '';
+}
+
+function renderCashCloseResult(session) {
+  const box = document.getElementById('cashCloseResultBox');
+  if (!box) return;
+
+  if (!session || session.isOpen) {
+    box.innerHTML = '';
+    return;
+  }
+
+  if (session.expectedAmount === null) {
+    // Sessão fechada sem passar pelo cálculo do servidor (ex: modo local
+    // sem backend) — não há o que comparar.
+    box.innerHTML = '';
+    return;
+  }
+
+  if (session.countedAmount === null) {
+    box.innerHTML = `<div class="panel metric-card"><span class="mini">Conferência do caixa</span><p class="mini">Esperado (servidor): ${formatCurrency(session.expectedAmount)} — nenhum valor contado foi informado neste fechamento.</p></div>`;
+    return;
+  }
+
+  const diff = session.difference ?? (session.countedAmount - session.expectedAmount);
+  const isEven = Math.abs(diff) < 0.005;
+  const label = isEven ? 'Confere' : (diff > 0 ? 'Sobra' : 'Falta');
+  const tone = isEven ? 'tag-success' : 'tag-danger';
+
+  box.innerHTML = `
+    <div class="dashboard-grid">
+      <article class="panel metric-card"><span class="mini">Esperado (servidor)</span><strong>${formatCurrency(session.expectedAmount)}</strong></article>
+      <article class="panel metric-card"><span class="mini">Contado</span><strong>${formatCurrency(session.countedAmount)}</strong></article>
+      <article class="panel metric-card"><span class="mini">Diferença</span><strong class="tag ${tone}">${label}: ${formatCurrency(Math.abs(diff))}</strong></article>
+    </div>
+  `;
 }
 
 export function resetCashSession() {
@@ -101,6 +195,7 @@ export function renderCashSession() {
   `;
   if (openBtn) openBtn.disabled = !!session?.isOpen;
   if (closeBtn) closeBtn.disabled = !session?.isOpen;
+  renderCashCloseResult(session);
 }
 
 export function bindCashSessionActions() {

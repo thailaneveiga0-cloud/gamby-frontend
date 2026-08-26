@@ -168,7 +168,18 @@ export async function cancelSale(id) {
   if (!sale || sale.cancelled) return;
   if (!window.confirm('Cancelar esta venda e devolver os itens ao estoque?')) return;
 
-  try { await cancelSaleService(id); } catch { /* fallback local */ }
+  try {
+    await cancelSaleService(id);
+  } catch (err) {
+    // O backend ainda considera a venda válida — nunca marcar como
+    // cancelada nem devolver estoque na tela sem confirmação real do
+    // servidor. Revalida o estado a partir do backend antes de liberar
+    // uma nova tentativa.
+    alert(`Não foi possível cancelar a venda: ${err?.message || 'erro ao contatar o servidor.'}`);
+    await initSales();
+    await initProducts();
+    return;
+  }
 
   sale.cancelled = true;
   sale.cancelledAt = new Date().toISOString();
