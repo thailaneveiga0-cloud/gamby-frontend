@@ -19,20 +19,33 @@ A base trabalha com **fallback local**:
 - quando o modo backend for ativado e a API responder, os serviços podem assumir gradualmente
 
 ## Endpoints sugeridos
-- `POST /auth/login`
-- `POST /auth/register`
-- `POST /auth/verification-code`
-- `GET /auth/health`
-- `GET /products`
-- `PUT /products/bulk`
-- `GET /sales`
-- `PUT /sales/bulk`
-- `GET /payments/settings`
-- `PUT /payments/settings`
-- `GET /companies/settings`
-- `PUT /companies/settings`
+- `GET /health`
+
+### Autenticação
+- `POST /v1/auth/login`
+- `POST /v1/auth/register`
+- `POST /v1/auth/verify-email`
+- `POST /v1/auth/resend-verification`
+
+### Produtos
+- `GET /v1/products`
+- `PUT /v1/products/bulk`
+
+### Vendas
+- `GET /v1/sales`
+- `PUT /v1/sales/bulk`
+
+### Pagamentos
+- `GET /v1/payments/settings`
+- `PUT /v1/payments/settings`
+
+### Empresa
+- `GET /v1/companies/settings`
+- `PUT /v1/companies/settings`
 
 ## Próxima etapa possível
 - substituir persistência local dos módulos por chamadas aos serviços
 - introduzir token JWT / refresh token
 - separar empresas por tenant real no backend
+- adicionar fluxo de recuperação de senha
+- tratar contas pendentes de verificação com reenvio automático de código

@@ -1,5 +1,8 @@
 export function formatCurrency(value) {
-  return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  return Number(value || 0).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
 }
 
 export function formatDateBR(value) {
@@ -40,6 +43,20 @@ export function normalizeString(value) {
 }
 
 export function toNumber(value, fallback = 0) {
-  const parsed = Number(value);
+  if (value === null || value === undefined || value === '') {
+    return fallback;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : fallback;
+  }
+
+  const normalized = String(value)
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/\./g, '')
+    .replace(',', '.');
+
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : fallback;
 }

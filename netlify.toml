@@ -1,0 +1,82 @@
+[build]
+  # npm install runs automatically when Netlify detects package.json.
+  # build.js reads GAMBY_API_URL to generate dist/assets/js/config.js.
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# ─── SPA fallback ─────────────────────────────────────────────────────────────
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+# ─── Security Headers ─────────────────────────────────────────────────────────
+# Applied to every response served from Netlify.
+#
+# CSP notes:
+#   'unsafe-inline' in script-src is required because index.html contains
+#   inline <script> blocks (tab switchers, marketing UI, etc.).
+#   Removing it would require extracting all inline scripts to external files —
+#   a separate refactor task. The remaining directives still provide strong
+#   protection against injected scripts from third-party origins.
+#
+#   connect-src 'self' https: allows the app to call any HTTPS backend.
+#   If you want to lock it further, replace `https:` with the exact backend
+#   domain (e.g., https://api.gamby.com.br).
+#
+#   frame-ancestors 'none' prevents this app from being embedded in iframes
+#   (clickjacking protection). X-Frame-Options is kept for legacy browser compat.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Prevent clickjacking
+    X-Frame-Options = "DENY"
+
+    # Prevent MIME sniffing
+    X-Content-Type-Options = "nosniff"
+
+    # Control referrer information sent with requests
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+    # Restrict browser feature access
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=()"
+
+    # HSTS — force HTTPS for 1 year (enable only after confirming HTTPS works end-to-end)
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+
+    # Content Security Policy — kept here as FALLBACK only.
+    # The production CSP (with computed sha256 hashes, no unsafe-inline) is generated
+    # at build time into dist/_headers which takes precedence over these headers.
+    # This fallback activates if _headers is absent (e.g., local static server).
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https:; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
+
+    # ── Cross-Origin Isolation ─────────────────────────────────────────────────
+    #
+    # COOP: same-origin — breaks window.opener reference across origins.
+    #   Prevents a malicious page opened via window.open() from navigating or
+    #   reading the opener's properties. Mitigates cross-window postMessage attacks.
+    Cross-Origin-Opener-Policy = "same-origin"
+
+    # COEP: credentialless — enables cross-origin isolation for the browsing context.
+    #   Resources loaded without credentials (CDN scripts) don't need CORP headers.
+    #   Combined with COOP, this activates SharedArrayBuffer blocking (Spectre defense).
+    #   Use 'require-corp' instead if all resources are served from same origin.
+    Cross-Origin-Embedder-Policy = "credentialless"
+
+    # CORP: same-site — prevents other sites from embedding our resources (images, scripts).
+    #   Applied to our own responses being loaded cross-origin.
+    Cross-Origin-Resource-Policy = "same-site"
+
+# Separate rule for JS bundles — add Cache-Control without overriding the headers above
+[[headers]]
+  for = "/assets/js/bundle.min.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/assets/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"

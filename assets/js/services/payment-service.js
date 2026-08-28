@@ -37,13 +37,13 @@ function settingsFromApi(settings) {
 
 export async function savePaymentSettingsService(settings) {
   if (isBackendReady()) {
-    // Backend é a fonte da verdade: se o PUT falhar, propaga o erro — nunca
-    // grava localmente como se tivesse persistido no servidor.
-    const payload = await httpRequest(buildEndpoint('payments', 'settings'), { method: 'PUT', body: JSON.stringify(settingsToApi(settings)) });
-    const normalized = settingsFromApi(payload);
-    save(KEYS.paymentSettings, normalized);
-    state.paymentSettings = normalized;
-    return normalized;
+    try {
+      const payload = await httpRequest(buildEndpoint('payments', 'settings'), { method: 'PUT', body: JSON.stringify(settingsToApi(settings)) });
+      const normalized = settingsFromApi(payload);
+      save(KEYS.paymentSettings, normalized);
+      state.paymentSettings = normalized;
+      return normalized;
+    } catch { /* fallback local */ }
   }
   save(KEYS.paymentSettings, settings);
   state.paymentSettings = settings;

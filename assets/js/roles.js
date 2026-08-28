@@ -1,47 +1,125 @@
-export const ROLE_NAMES = Object.freeze(['desenvolvedora', 'administrador', 'gerente', 'operador']);
-
-export const permissions = Object.freeze({
+export const permissions = {
   desenvolvedora: {
-    label: 'Desenvolvedora', devOnly: true, adminOrDev: true, financial: true, backup: true,
-    payments: true, globalAccess: true, manageUsers: true, marketplace: true, settings: true,
-    pages: ['dashboard', 'produtos', 'pdv', 'financeiro', 'historico', 'relatorios', 'marketplace', 'usuarios', 'configuracoes', 'desenvolvedora']
+    label: 'Desenvolvedora',
+    devOnly: true,
+    financial: true,
+    backup: true,
+    productManage: true,
+    payments: true,
+    adminOrDev: true,
+    marketplace: true,
+    settings: true,
+    users: true,
+    reports: true,
+    dashboard: true,
+    estoque: true,
+    pdv: true,
+    caixa: true
   },
+
   administrador: {
-    label: 'Administrador', devOnly: false, adminOrDev: true, financial: true, backup: true,
-    payments: false, globalAccess: false, manageUsers: true, marketplace: true, settings: true,
-    pages: ['dashboard', 'produtos', 'pdv', 'financeiro', 'historico', 'relatorios', 'marketplace', 'usuarios', 'configuracoes']
+    label: 'Administrador',
+    devOnly: false,
+    financial: true,
+    backup: true,
+    productManage: true,
+    payments: true,
+    adminOrDev: true,
+    marketplace: true,
+    settings: true,
+    users: true,
+    reports: true,
+    dashboard: true,
+    estoque: true,
+    pdv: true,
+    caixa: true
   },
+
   gerente: {
-    label: 'Gerente', devOnly: false, adminOrDev: false, financial: true, backup: false,
-    payments: false, globalAccess: false, manageUsers: false, marketplace: false, settings: false,
-    pages: ['dashboard', 'produtos', 'pdv', 'financeiro', 'historico', 'relatorios']
+    label: 'Gerente',
+    devOnly: false,
+    financial: true,
+    backup: false,
+    productManage: true,
+    payments: true,
+    adminOrDev: false,
+    marketplace: false,
+    settings: false,
+    users: false,
+    reports: true,
+    dashboard: true,
+    estoque: true,
+    pdv: true,
+    caixa: true
   },
+
   operador: {
-    label: 'Operador', devOnly: false, adminOrDev: false, financial: false, backup: false,
-    payments: false, globalAccess: false, manageUsers: false, marketplace: false, settings: false,
-    pages: ['pdv']
+    label: 'Operador',
+    devOnly: false,
+    financial: false,
+    backup: false,
+    productManage: false,
+    payments: false,
+    adminOrDev: false,
+    marketplace: false,
+    settings: false,
+    users: false,
+    reports: false,
+    dashboard: false,
+    estoque: false,
+    pdv: true,
+    caixa: true
   }
-});
+};
 
-export function normalizeRole(role = '') {
-  const value = String(role).trim().toLowerCase();
-  const aliases = { developer: 'desenvolvedora', desenvolvedor: 'desenvolvedora', admin: 'administrador', manager: 'gerente', operator: 'operador' };
-  return aliases[value] || value;
+export function getRoleLabel(role) {
+  const normalized = String(role || '').trim().toLowerCase();
+  return permissions[normalized]?.label || 'Usuário';
 }
 
-export function getRoleConfig(role) { return permissions[normalizeRole(role)] || null; }
-export function getRoleLabel(role) { return getRoleConfig(role)?.label || role; }
-export function can(role, permission) { return Boolean(getRoleConfig(role)?.[permission]); }
+export function normalizeRole(role) {
+  const normalized = String(role || '').trim().toLowerCase();
 
-export function resolveAllowedPages(role, backendPages) {
+  if (permissions[normalized]) return normalized;
+
+  if (normalized === 'admin') return 'administrador';
+  if (normalized === 'admin_master') return 'desenvolvedora';
+  if (normalized === 'developer') return 'desenvolvedora';
+  if (normalized === 'developer_master') return 'desenvolvedora'; // superset — acesso total
+  if (normalized === 'platform_admin') return 'administrador';
+
+  return 'operador';
+}
+
+export function isDeveloperRole(role) {
+  return normalizeRole(role) === 'desenvolvedora';
+}
+
+export function isAdminRole(role) {
+  return normalizeRole(role) === 'administrador';
+}
+
+export function isManagerRole(role) {
+  return normalizeRole(role) === 'gerente';
+}
+
+export function isOperatorRole(role) {
+  return normalizeRole(role) === 'operador';
+}
+
+export function canAuthorizeCriticalAction(role) {
+  const normalized = normalizeRole(role);
+  return (
+    normalized === 'desenvolvedora' ||
+    normalized === 'administrador' ||
+    normalized === 'gerente'
+  );
+}
+
+export function can(permission, role) {
   const normalizedRole = normalizeRole(role);
-  const localCeiling = getRoleConfig(normalizedRole)?.pages || [];
-  if (normalizedRole === 'desenvolvedora') return [...localCeiling];
-  if (normalizedRole === 'operador') return ['pdv'];
-  if (!Array.isArray(backendPages)) return [...localCeiling];
-  return backendPages.filter((page) => localCeiling.includes(page));
-}
+  const config = permissions[normalizedRole];
 
-export function isManagementRole(role) {
-  return ['desenvolvedora', 'administrador', 'gerente'].includes(normalizeRole(role));
+  if (!config) return false;
+  return Boolean(config[permission]);
 }

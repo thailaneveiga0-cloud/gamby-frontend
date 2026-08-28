@@ -1,61 +1,22 @@
-# Environment and local secrets
-.env
-.env.*
-!.env.example
-!.env.sample
+# Sistema operacional
+.DS_Store
+Thumbs.db
 
-# Dependencies
-node_modules/
-
-# Build and coverage output
-dist/
-build/
-out/
-coverage/
-.nyc_output/
+# Editor
+.vscode/
+.idea/
 
 # Logs
 *.log
-logs/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
 
-# Tool and editor caches
-.cache/
-.parcel-cache/
-.eslintcache
-.stylelintcache
-.vite/
-.turbo/
-.next/
-.nuxt/
-*.tsbuildinfo
+# Backup de HTML gerado pelo editor
+*.html.html
 
-# Local databases
-*.db
-*.db-journal
-*.sqlite
-*.sqlite3
+# Build output (gerado por npm run build no Netlify)
+dist/
 
-# Certificates, tokens, and private keys
-*.key
-*.pem
-*.p12
-*.pfx
-*.jks
-*.keystore
-*.token
-id_rsa
-id_rsa.*
-id_ed25519
-id_ed25519.*
+# DependÃªncias
+node_modules/
 
-# Operating system and IDE files
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
-*.swp
-*.swo
+# ConfiguraÃ§Ãµes locais do Claude Code
+.claude/

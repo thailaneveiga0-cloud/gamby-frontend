@@ -1,49 +1,111 @@
 import { state } from './state.js';
 import { can } from './roles.js';
-import { persistProducts, renderProducts, updateProductMetrics } from './products.js';
-import { downloadBlob } from './utils.js';
+import {
+  persistProducts,
+  renderProducts,
+  renderStockTable,
+  renderLowStock,
+  renderRemoveSelector,
+  updateProductMetrics
+} from './products.js';
+import { downloadBlob, toNumber } from './utils.js';
+import { setMessage } from './ui.js';
 
 function isValidProduct(item) {
   return item && typeof item.name === 'string' && typeof item.code === 'string';
 }
 
-export function exportProductsJSON() {
-  if (!can(state.currentUser?.role, 'backup')) return alert('Sem permissão para exportar backup.');
-  const payload = {
-    exportedAt: new Date().toISOString(),
-    version: 'stage7',
-    products: state.products
+function normalizeImportedProduct(item) {
+  return {
+    ...item,
+    name: String(item.name || '').trim(),
+    code: String(item.code || '').trim(),
+    barcode: String(item.barcode || '').trim(),
+    category: String(item.category || '').trim(),
+    price: toNumber(item.price ?? item.salePrice, 0),
+    cost: toNumber(item.cost ?? item.costPrice, 0),
+    stock: toNumber(item.stock, 0),
+    minStock: toNumber(item.minStock, 1)
   };
-  downloadBlob('gamby-produtos-backup.json', new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
 }
 
-export function importProductsJSON(event) {
-  if (!can(state.currentUser?.role, 'backup')) {
-    alert('Sem permissão para importar backup.');
-    event.target.value = '';
+function userCanBackup() {
+  return can(state.currentUser?.role, 'backup');
+}
+
+export function exportProductsJSON() {
+  if (!userCanBackup()) {
+    setMessage('Sem permissão para exportar backup.', true);
     return;
   }
-  const file = event.target.files?.[0];
+
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    version: 'stage10',
+    companyId: state.currentUser?.companyId || null,
+    products: Array.isArray(state.products) ? state.products : []
+  };
+
+  downloadBlob(
+    'gamby-produtos-backup.json',
+    new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json'
+    })
+  );
+
+  setMessage('Backup dos produtos exportado com sucesso.');
+}
+
+export async function importProductsJSON(event) {
+  if (!userCanBackup()) {
+    setMessage('Sem permissão para importar backup.', true);
+    if (event?.target) event.target.value = '';
+    return;
+  }
+
+  const file = event?.target?.files?.[0];
   if (!file) return;
+
   const reader = new FileReader();
-  reader.onload = (e) => {
+
+  reader.onload = async (e) => {
     try {
-      const data = JSON.parse(e.target.result);
-      const importedProducts = Array.isArray(data) ? data : data.products;
-      if (!Array.isArray(importedProducts) || importedProducts.some((item) => !isValidProduct(item))) {
+      const raw = JSON.parse(e.target.result);
+      const importedProducts = Array.isArray(raw) ? raw : raw.products;
+
+      if (!Array.isArray(importedProducts)) {
         throw new Error('Formato inválido');
       }
-      state.products = importedProducts;
-      persistProducts();
+
+      const normalizedProducts = importedProducts
+        .filter((item) => isValidProduct(item))
+        .map(normalizeImportedProduct)
+        .filter((item) => item.name && item.code);
+
+      if (!normalizedProducts.length) {
+        throw new Error('Nenhum produto válido encontrado');
+      }
+
+      state.products = normalizedProducts;
+
+      await persistProducts();
       renderProducts();
+      renderStockTable();
+      renderLowStock();
+      renderRemoveSelector();
       updateProductMetrics();
-      alert('Backup importado com sucesso.');
-    } catch {
-      alert('Não foi possível importar o arquivo. Verifique o formato do backup.');
+
+      setMessage('Backup importado com sucesso.');
+    } catch (error) {
+      console.error('Erro ao importar backup:', error);
+      setMessage('Não foi possível importar o arquivo. Verifique o formato do backup.', true);
     } finally {
-      event.target.value = '';
+      if (event?.target) {
+        event.target.value = '';
+      }
     }
   };
+
   reader.readAsText(file);
 }
 

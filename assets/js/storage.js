@@ -10,7 +10,9 @@ export const KEYS = {
   marketplace: 'gamby_marketplace_modular',
   history: 'gamby_history_modular',
   backendConfig: 'gamby_backend_config_modular',
-  developmentConfig: 'gamby_development_config_modular'
+  orders: 'gamby_orders_modular',
+  terminals: 'gamby_terminals_modular',
+  notificationSettings: 'gamby_notification_settings_modular'
 };
 
 export function load(key, fallback) {
@@ -23,7 +25,15 @@ export function load(key, fallback) {
 }
 
 export function save(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
+      console.warn('[Storage] Espaço insuficiente no localStorage para salvar:', key);
+    } else {
+      throw e;
+    }
+  }
 }
 
 export function remove(key) {

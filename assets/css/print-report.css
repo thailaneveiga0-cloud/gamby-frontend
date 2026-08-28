@@ -1,0 +1,116 @@
+/* print-report.css — Estilo dos relatórios detalhados (janela de impressão) */
+body {
+  font-family: Arial, sans-serif;
+  background: #ffffff;
+  color: #111827;
+  margin: 0;
+  padding: 24px;
+}
+
+.report-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.report-head {
+  margin-bottom: 24px;
+}
+
+.report-head h1 {
+  margin: 0 0 8px;
+  font-size: 26px;
+}
+
+.report-head p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 22px 0;
+}
+
+.report-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: #f8fafc;
+}
+
+.report-card span {
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.report-card strong {
+  font-size: 18px;
+}
+
+h2 {
+  margin: 28px 0 14px;
+  font-size: 18px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 18px;
+}
+
+thead th {
+  background: #f3f4f6;
+  text-align: left;
+  padding: 12px 10px;
+  font-size: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+tbody td {
+  padding: 12px 10px;
+  font-size: 13px;
+  border: 1px solid #e5e7eb;
+  vertical-align: top;
+}
+
+.footer {
+  margin-top: 28px;
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+}
+
+.av {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #374151;
+  font-size: 8px;
+  font-weight: 700;
+  flex-shrink: 0;
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.av.av-sm { width: 18px; height: 18px; font-size: 7px; }
+.av.has-photo { background: transparent; }
+.av.has-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+
+.rpt-op-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+@media print {
+  body { padding: 0; }
+  .report-wrap { max-width: 100%; }
+}

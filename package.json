@@ -1,0 +1,16 @@
+{
+  "name": "gamby-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "build:obfuscate": "node scripts/build.js --obfuscate",
+    "validate:frontend-security": "node scripts/validate-frontend-security.js"
+  },
+  "devDependencies": {
+    "clean-css": "^5.3.3",
+    "esbuild": "^0.21.5",
+    "javascript-obfuscator": "^4.1.1"
+  }
+}

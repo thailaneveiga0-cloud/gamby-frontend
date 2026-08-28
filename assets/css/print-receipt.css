@@ -1,0 +1,4 @@
+/* print-receipt.css — Estilo do comprovante de venda (janela de impressão) */
+body    { font-family: Arial, sans-serif; padding: 20px; }
+.prt-meta { margin-bottom: 12px; font-size: 12px; color: #4b5563; }
+.prt-item { margin-bottom: 8px; }
