@@ -60,7 +60,9 @@ export async function registerOperatorService(name, cpf, pin) {
   // Sanitizar PIN: backend exige 4-6 dígitos numéricos.
   // Se pin tiver letras (ex: usuário digitou senha de login), extrair apenas dígitos.
   const sanitizedPin = String(pin || '').replace(/\D/g, '').slice(0, 6);
-  console.log('[PDV-REGISTER-OPERATOR] payload | name:', JSON.stringify(name), '| pin numérico:', sanitizedPin ? sanitizedPin.replace(/./, '*') : '—', '| cpf:', !!cpf);
+  // Fase 2 (D4.2): log removido — chegava a expor 5 de 6 dígitos do PIN em
+  // claro no console (.replace(/./, '*') sem flag 'g' só troca o primeiro
+  // caractere). PIN não vai para log de nenhuma forma, nem mascarado.
   if (!name || sanitizedPin.length < 4) {
     console.warn('[PDV-REGISTER-OPERATOR] payload incompleto | name:', !!name, '| pin dígitos:', sanitizedPin.length);
     return null;

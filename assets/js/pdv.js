@@ -1818,30 +1818,36 @@ async function executeCancelSale(id, reason) {
       return;
     }
 
-    // Atualização otimista — marcar como cancelada em state.sales imediatamente
-    // para feedback visual instantâneo antes do round-trip ao backend.
+    // Fase 2 (D4.3/D4.4): backend é a fonte da verdade — nenhuma mutação
+    // local (marcar cancelada, devolver estoque, renderizar) acontece
+    // ANTES da confirmação real do servidor. A versão anterior aplicava
+    // tudo isso "otimisticamente" e só ENTÃO chamava o backend; como
+    // cancelSaleService() engolia qualquer erro do backend (catch vazio),
+    // um 403/422/500 nunca desfazia a mutação local — a UI ficava mostrando
+    // "cancelada" e estoque devolvido mesmo quando o backend rejeitou.
+    // Agora: chama o backend primeiro; só depois de sucesso real (sem
+    // exceção) é que o estado local é atualizado.
+    await cancelSaleService(saleId, cancelReason);
+
+    // Só a partir daqui sabemos que o backend confirmou o cancelamento —
+    // aplicar as mesmas mutações de antes, agora depois da confirmação
+    // (não há endpoint de reload de produtos disponível neste módulo para
+    // revalidar o estoque a partir do servidor; refreshSalesState() só
+    // recarrega vendas, não produtos — ver app.js:2922-2937).
     saleBeforeCancel.status      = 'cancelled';
     saleBeforeCancel.cancelled   = true;
     saleBeforeCancel.isCancelled = true;
     saleBeforeCancel.cancelReason  = cancelReason;
     saleBeforeCancel.cancelledAt   = new Date().toISOString();
-    renderRecentSales();
 
-    // Restaurar estoque dos produtos cancelados
     if (Array.isArray(saleBeforeCancel.items) && Array.isArray(state.products)) {
       saleBeforeCancel.items.forEach((saleItem) => {
         const productId = saleItem.productId || saleItem.id;
         const product = state.products.find((p) => String(p.id) === String(productId));
-
         if (!product) return;
-
-        product.stock =
-          Number(product.stock || 0) +
-          Number(saleItem.quantity || 0);
+        product.stock = Number(product.stock || 0) + Number(saleItem.quantity || 0);
       });
     }
-
-    await cancelSaleService(saleId, cancelReason);
 
     audit('sale_cancelled', {
       saleId,
@@ -1861,7 +1867,8 @@ async function executeCancelSale(id, reason) {
     showToast('Venda cancelada com sucesso.');
     document.dispatchEvent(new CustomEvent('gamby:sales-updated'));
 
-    // Sync com backend após confirmar persistência
+    // Revalidar vendas a partir do servidor (fonte de verdade) em cima da
+    // mutação local já confirmada.
     await refreshSalesState();
     renderRecentSales();
   } catch (error) {
@@ -1877,6 +1884,16 @@ async function executeCancelSale(id, reason) {
     } catch {}
 
     showToast(error?.message || 'Erro ao cancelar venda.', 'error');
+
+    // Fase 2 (D4.3/D4.4): nenhuma mutação local foi feita antes desta
+    // falha — nada para desfazer. Revalida mesmo assim, por segurança
+    // (ex.: se o backend processou a operação mas a resposta se perdeu
+    // na rede, o próximo refresh reflete o estado real do servidor em
+    // vez do estado local desatualizado).
+    try {
+      await refreshSalesState();
+      renderRecentSales();
+    } catch {}
   }
 }
 

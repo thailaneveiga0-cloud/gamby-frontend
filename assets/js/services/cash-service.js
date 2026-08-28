@@ -9,15 +9,15 @@ export async function getCurrentCashSessionService() {
 export async function openCashSessionService(payload) {
   if (!isBackendReady()) return null;
 
-  // Backend schema (openCashSchema, strict): openingBalance, password, terminalName,
-  // terminalCode, notes. Campo do frontend é 'openingAmount' → mapear para
-  // 'openingBalance'. Campos extras (operatorId, authorizedById, businessDate etc.)
-  // são rejeitados por .strict(). 'password' é obrigatório no controller sempre que
-  // pdvSettings.requireAuthOpenCash estiver ligado — sem isso, abre 403 silencioso.
+  // Fase 2 (D2.1): contrato atual do backend (openCashSchema, .strict()):
+  // openingAmount, password?, terminalName?, terminalCode?, notes?. Nomes
+  // legados (openingBalance) removidos — o backend é a fonte correta dos
+  // nomes, o frontend se alinha a ele. 'password' só é exigido pelo
+  // controller quando pdvSettings.requireAuthOpenCash estiver ligado.
   const body = {
-    openingBalance: typeof payload?.openingAmount === 'number'
+    openingAmount: typeof payload?.openingAmount === 'number'
       ? payload.openingAmount
-      : Number(payload?.openingAmount ?? payload?.openingBalance ?? 0),
+      : Number(payload?.openingAmount ?? 0),
     password:      payload?.password      || undefined,
     terminalName:  payload?.terminalName  || undefined,
     terminalCode:  payload?.terminalCode  || undefined,
@@ -25,8 +25,6 @@ export async function openCashSessionService(payload) {
   };
   // Remover campos undefined para não enviá-los
   Object.keys(body).forEach(k => body[k] === undefined && delete body[k]);
-
-  console.log('[CASH-OPEN] payload enviado para /v1/cash-sessions/open:', JSON.stringify(body));
 
   return httpRequest(buildEndpoint('cashSessions', 'open'), {
     method: 'POST',
@@ -41,21 +39,25 @@ export async function closeCashSessionService(cashSessionId, payload) {
     throw new Error('ID da sessão de caixa não informado.');
   }
 
-  // Backend schema (closeCashSchema, strict): closingBalance, password (opcional
-  // na validação, mas exigido pelo controller quando operatorMustAuth ||
-  // pdvSettings.requireAuthCloseCash — sem enviá-lo, esses casos 403/422),
-  // notes. Frontend usa 'closingAmount' → mapear para 'closingBalance'.
-  // Campos extras (countedAmount, openingAmount, salesAmount etc.) rejeitados por .strict().
+  // Fase 2 (D2.2): contrato atual do backend (closeCashSchema, .strict()):
+  // closingAmount, countedAmount?, password?, notes?. countedAmount é
+  // calculado em cash-session.js e agora chega até a API — antes era
+  // descartado aqui, deixando a comparação Confere/Sobra/Falta sempre
+  // null no servidor. Campos extras que cash-session.js também envia
+  // (terminalName, operatorId etc.) não fazem parte deste schema — não
+  // são "esquecidos", são deliberadamente filtrados (o schema é
+  // .strict() e rejeitaria qualquer chave desconhecida).
   const body = {
-    closingBalance: typeof payload?.closingAmount === 'number'
+    closingAmount: typeof payload?.closingAmount === 'number'
       ? payload.closingAmount
-      : Number(payload?.closingAmount ?? payload?.closingBalance ?? 0),
+      : Number(payload?.closingAmount ?? 0),
+    countedAmount: payload?.countedAmount != null
+      ? Number(payload.countedAmount)
+      : undefined,
     password: payload?.password || undefined,
     notes: payload?.notes || undefined,
   };
   Object.keys(body).forEach(k => body[k] === undefined && delete body[k]);
-
-  console.log('[CASH-CLOSE] payload enviado para /v1/cash-sessions/close:', JSON.stringify(body));
 
   return httpRequest(buildEndpoint('cashSessions', `${cashSessionId}/close`), {
     method: 'POST',
@@ -66,9 +68,10 @@ export async function closeCashSessionService(cashSessionId, payload) {
 export async function reopenCashSessionService(payload = {}) {
   if (!isBackendReady()) return null;
 
-  // Backend schema (reopenCashSchema, strict): openingBalance (opt), password (opt), notes.
+  // Fase 2 (D5): contrato atual do backend (reopenCashSchema, .strict()):
+  // openingAmount? (opcional), password?, notes?.
   const body = {
-    openingBalance: payload?.openingAmount != null
+    openingAmount: payload?.openingAmount != null
       ? Number(payload.openingAmount)
       : undefined,
     notes: payload?.notes || undefined,

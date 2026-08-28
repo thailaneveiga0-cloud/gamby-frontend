@@ -66,7 +66,10 @@ const _PM_MAP = {
   other:    'other',
 };
 
-function mapPaymentMethod(pm) {
+// Fase 2 (D1.5): exportada para que o teste de contrato importe a MESMA
+// implementação usada em produção — nunca uma cópia. Qualquer chamador
+// interno deste arquivo (normalizeOutgoingSalePayload) usa esta função.
+export function normalizePaymentMethod(pm) {
   if (!pm) return 'cash';
   const key = String(pm).toLowerCase().trim()
     .normalize('NFD').replace(/[̀-ͯ]/g, ''); // remove acentos
@@ -109,22 +112,30 @@ function normalizeOutgoingSalePayload(payload = {}) {
       })
     : [];
 
-  // totalAmount é o nome correto no backend (frontend usava 'total')
+  // totalAmount é o nome correto no backend (frontend usava 'total').
+  // Fase 2 (D3.1): aceito pelo schema por compatibilidade — o total
+  // autoritativo é sempre recalculado no servidor a partir de items,
+  // então este valor nunca determina o que é persistido.
   const totalAmount = toNumber(payload.total ?? payload.totalAmount, 0);
 
   return {
     items,
-    paymentMethod: mapPaymentMethod(payload.paymentMethod),
+    paymentMethod: normalizePaymentMethod(payload.paymentMethod),
     totalAmount,
 
     // UUIDs opcionais: null → undefined (Zod rejeita null em _uuid().optional())
     cashSessionId: optStr(payload.cashSessionId ?? cashContext.cashSessionId),
     terminalName:  optStr(payload.terminalName  ?? cashContext.terminalName),
     terminalCode:  optStr(payload.terminalCode  ?? cashContext.terminalCode),
-    operatorId:    optStr(payload.operatorId    ?? cashContext.operatorId),
+    // Fase 2 (D3.3): operatorId e operatorPin NÃO são mais enviados — o
+    // backend não os aceita no schema (proteção contra falsificação de
+    // autoria, decidida na Missão B; a identidade real vem de
+    // req.auth.sub no servidor). operatorName/operatorCpf continuam
+    // enviados por compatibilidade (D3.4) — o backend já os aceita e
+    // ignora para fins de autoria (vêm de resolveOperatorIdentity, nunca
+    // do payload).
     operatorName:  optStr(payload.operatorName  ?? cashContext.operatorName),
     operatorCpf:   optStr(payload.operatorCpf   ?? cashContext.operatorCpf),
-    operatorPin:   optStr(payload.operatorPin   ?? cashContext.operatorPin),
     discount:      toNumber(payload.discount, 0),
     notes:         optStr(payload.notes),
     // customerId, isDelivery, discountType omitidos se não informados
@@ -175,11 +186,52 @@ export async function createSaleService(payload) {
   return localSale;
 }
 
+// Fase 2 (D4.3/D4.4): backend é a fonte da verdade. A versão anterior
+// marcava a venda como cancelada no estado local ANTES de chamar o
+// backend, e engolia qualquer erro (403/422/500/rede) com um catch vazio
+// — um cancelamento rejeitado pelo backend (ex.: sem permissão) ainda
+// aparecia como "cancelada com sucesso" pro usuário. Agora: sem backend
+// configurado (modo local/demo — não é falha de rede, é configuração
+// deliberada, ver isBackendReady()), mantém o comportamento local
+// original. Com backend configurado, chama a API primeiro e só grava
+// localmente depois de confirmação real; qualquer erro do backend
+// propaga (nunca é convertido em sucesso fictício) — o caller decide o
+// que fazer com o erro.
 export async function cancelSaleService(
   saleId,
   reason = 'Erro de lançamento',
   authorizationPassword = null
 ) {
+  if (!isBackendReady()) {
+    const current = load(getScopedSalesKey(), []);
+    const next = current.map((sale) =>
+      String(sale.id) === String(saleId)
+        ? {
+            ...sale,
+            cancelled: true,
+            status: 'cancelled',
+            cancelReason: reason,
+            cancelledAt: new Date().toISOString()
+          }
+        : sale
+    );
+    save(getScopedSalesKey(), next);
+
+    return {
+      ok: true,
+      saleId,
+      message: 'Venda cancelada localmente.'
+    };
+  }
+
+  const response = await httpRequest(buildEndpoint('sales', `${saleId}/cancel`), {
+    method: 'POST',
+    body: JSON.stringify({
+      reason,
+      password: authorizationPassword || undefined
+    })
+  });
+
   const current = load(getScopedSalesKey(), []);
   const next = current.map((sale) =>
     String(sale.id) === String(saleId)
@@ -192,28 +244,9 @@ export async function cancelSaleService(
         }
       : sale
   );
-
   save(getScopedSalesKey(), next);
 
-  if (isBackendReady()) {
-    try {
-      await httpRequest(buildEndpoint('sales', `${saleId}/cancel`), {
-        method: 'POST',
-        body: JSON.stringify({
-          reason,
-          password: authorizationPassword || undefined
-        })
-      });
-    } catch {
-      // backend indisponível — operação já salva localmente
-    }
-  }
-
-  return {
-    ok: true,
-    saleId,
-    message: 'Venda cancelada localmente.'
-  };
+  return response || { ok: true, saleId, message: 'Venda cancelada com sucesso.' };
 }
 
 export async function persistSales(sales) {
