@@ -2,7 +2,7 @@ import { state } from './state.js';
 import { KEYS, load, save } from './storage.js';
 import { SUBSCRIPTION_STATES } from './access-control.js';
 
-export const DEFAULT_DEVELOPMENT_CONFIG = Object.freeze({ enabled: true, allowLocalDeveloperLogin: true, simulateSubscription: false, simulatedSubscriptionStatus: 'active' });
+export const DEFAULT_DEVELOPMENT_CONFIG = Object.freeze({ enabled: false, allowLocalDeveloperLogin: false, simulateSubscription: false, simulatedSubscriptionStatus: 'active' });
 
 export function initDevelopmentConfig() {
   const persisted = load(KEYS.developmentConfig, {});

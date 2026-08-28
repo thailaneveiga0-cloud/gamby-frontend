@@ -2,8 +2,8 @@ import { state } from './state.js';
 import { KEYS, load, save } from './storage.js';
 
 export const DEFAULT_BACKEND_CONFIG = {
-  enabled: false,
-  apiBaseUrl: 'http://localhost:3000',
+  enabled: true,
+  apiBaseUrl: 'https://gamby-api-staging.onrender.com',
   timeoutMs: 10000,
   tenantHeader: 'X-Tenant-Id',
   tenantId: '',
