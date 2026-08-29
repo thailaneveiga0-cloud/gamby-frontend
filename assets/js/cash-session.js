@@ -1254,9 +1254,28 @@ export async function reopenCashSession(options = {}) {
 
 /* ================= ACTIONS ================= */
 
+// Fase 3.1a — a obrigatoriedade de countedAmount vale SOMENTE para esta tela
+// interativa de conferência (#closeCashBtn, dentro de #cashCloseConferenceModal).
+// Os outros chamadores de closeCashSession() (protectedCloseCash() em pdv.js,
+// window.closePDVCashFlow, o botão dinâmico de openPDVExitOptions() em app.js)
+// continuam fechando direto, sem essa exigência — não são tocados aqui.
+function _readCountedAmountRaw() {
+  return String(document.getElementById('cashCountedAmount')?.value ?? '').trim();
+}
+
 function requestProtectedCashClose() {
   if (!state.cashSession?.isOpen) {
     showToast('Nenhum caixa aberto para fechar.', 'warning');
+    return;
+  }
+
+  // Vazio (string) é "não informado" — diferente de "0", que é uma contagem
+  // legítima (caixa conferido e vazio). Nunca usar expectedAmount como
+  // fallback aqui: é exatamente o comportamento que causava o bloqueador
+  // ALTO B (difference sempre 0, independente da contagem física real).
+  if (!_readCountedAmountRaw()) {
+    showToast('Informe o valor contado em caixa.', 'warning');
+    document.getElementById('cashCountedAmount')?.focus();
     return;
   }
 
@@ -1270,11 +1289,48 @@ function requestProtectedCashClose() {
   if (_needsAuthCloseCash && typeof window.openSecureCashCloseModal === 'function') {
     window.openSecureCashCloseModal(async () => {
       await closeCashSession();
+      hideCashCloseConferenceModal();
     }, { forceAuth: true });
     return;
   }
 
-  closeCashSession();
+  closeCashSession().finally(() => hideCashCloseConferenceModal());
+}
+
+/* ================= CONFERÊNCIA (Fase 3.1a) ================= */
+
+// Reseta o campo de contagem para vazio — nunca deixar um valor residual de
+// uma abertura anterior do modal vazar para os outros caminhos de fechamento
+// (protectedCloseCash() etc.), que também leem #cashCountedAmount via
+// closeCashSession() mas não devem herdar uma contagem que não confirmaram.
+function _resetCashCountedField() {
+  const input = document.getElementById('cashCountedAmount');
+  if (input) input.value = '';
+  const statusEl = document.getElementById('cashCloseStatusLabel');
+  if (statusEl) statusEl.textContent = 'Aguardando';
+  // Estado neutro — nem "is-ok" nem "is-surplus"/"is-shortage": nenhuma
+  // contagem foi informada ainda, não é o mesmo que "diferença zero".
+  document.getElementById('cashDifferenceBox')?.classList.remove('is-ok', 'is-surplus', 'is-shortage');
+  const diffValueEl = document.getElementById('cashDifferenceValue');
+  if (diffValueEl) diffValueEl.textContent = '—';
+}
+
+export function openCashCloseConferenceModal() {
+  if (!state.cashSession?.isOpen) {
+    showToast('Nenhum caixa aberto para fechar.', 'warning');
+    return;
+  }
+
+  _resetCashCountedField();
+  updateCashCloseSummary();
+
+  document.getElementById('cashCloseConferenceModal')?.classList.remove('hidden');
+  setTimeout(() => document.getElementById('cashCountedAmount')?.focus(), 80);
+}
+
+export function hideCashCloseConferenceModal() {
+  document.getElementById('cashCloseConferenceModal')?.classList.add('hidden');
+  _resetCashCountedField();
 }
 
 function printCashCloseReport() {
@@ -1310,6 +1366,7 @@ export function renderCashSession() {
   const openBtn = document.getElementById('openCashBtn');
   const closeBtn = document.getElementById('closeCashBtn');
   const pdvCloseBtn = document.getElementById('pdvCloseCashBtn');
+  const pdvCloseWithCountBtn = document.getElementById('pdvCloseCashWithCountBtn');
 
   const metricCashSession = document.getElementById('metricCashSession');
   const cashSummaryStatus = document.getElementById('cashSummaryStatus');
@@ -1421,6 +1478,7 @@ export function renderCashSession() {
   if (openBtn) openBtn.disabled = !!session?.isOpen;
   if (closeBtn) closeBtn.disabled = !session?.isOpen;
   if (pdvCloseBtn) pdvCloseBtn.disabled = !session?.isOpen;
+  if (pdvCloseWithCountBtn) pdvCloseWithCountBtn.disabled = !session?.isOpen;
 
   if (metricCashSession) metricCashSession.textContent = session?.isOpen ? 'Aberto' : 'Fechado';
   if (cashSummaryStatus) cashSummaryStatus.textContent = session?.isOpen ? 'Aberto' : 'Fechado';
@@ -1472,6 +1530,12 @@ export function bindCashSessionActions() {
   document.getElementById('cashCountedAmount')?.addEventListener('input', updateCashCloseSummary);
   document.getElementById('previewCashCloseBtn')?.addEventListener('click', updateCashCloseSummary);
   document.getElementById('printCashCloseBtn')?.addEventListener('click', printCashCloseReport);
+
+  // Fase 3.1a — abre/fecha o modal de conferência. #pdvCloseCashBtn (Alt+X,
+  // fechamento rápido) não é tocado — continua chamando closeCashSession()
+  // direto, sem conferência, exatamente como antes.
+  document.getElementById('pdvCloseCashWithCountBtn')?.addEventListener('click', openCashCloseConferenceModal);
+  document.getElementById('cancelCashCloseConferenceBtn')?.addEventListener('click', hideCashCloseConferenceModal);
 
   document.getElementById('reopenCashBtn')?.addEventListener('click', () => {
     audit('cash_reopen_requested', { session: state.cashSession });
