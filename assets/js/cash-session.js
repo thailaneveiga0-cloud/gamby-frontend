@@ -14,7 +14,8 @@ import {
   getCurrentCashSessionService,
   openCashSessionService,
   closeCashSessionService,
-  reopenCashSessionService
+  reopenCashSessionService,
+  getCashClosePreviewService
 } from './services/cash-service.js';
 
 function _isSimplifiedPDV() {
@@ -170,6 +171,10 @@ function mapCashSession(session) {
   };
 }
 
+// Consumidor: card "Vendas do dia" do dashboard (renderCashSession()) — soma
+// legitimamente o faturamento total do dia, de qualquer forma de pagamento.
+// NÃO usar para o fechamento de caixa — ver getSessionSalesTotal() abaixo
+// (Fase 3.1a-bis, C1).
 function getTodayValidSalesTotal() {
   const sales = Array.isArray(state.sales) ? state.sales : [];
   const today = new Date().toLocaleDateString('pt-BR');
@@ -182,6 +187,47 @@ function getTodayValidSalesTotal() {
 
     const saleDate = new Date(rawDate).toLocaleDateString('pt-BR');
     if (saleDate !== today) return acc;
+
+    return acc + Number(sale.total || 0);
+  }, 0);
+}
+
+// Fase 3.1a-bis (ALTO C, C1): escopa por cashSessionId, não por data local —
+// alinhado ao critério real do backend (cash.controller.js:
+// prisma.sale.findMany({where:{cashSessionId,...}})). O bug original (ALTO C)
+// era exatamente essa divergência de escopo: sessão que atravessa meia-noite,
+// duas sessões no mesmo dia (inclusive reabertura — reopenCashController
+// sempre cria uma sessão nova, nunca reaproveita o id anterior) faziam o
+// preview e o resultado final do backend somarem conjuntos de vendas
+// diferentes.
+//
+// Emenda Final Pré-Checkpoint (C3 CONFIRMADO): esta função soma o TOTAL da
+// venda, de qualquer forma de pagamento — não replica a composição por
+// método (C2/H1-b) que cash.controller.js aplica na resposta autoritativa
+// (soma só a parcela cash de cada venda, via SalePayment, com fallback
+// legado). Reproduzir essa regra aqui duplicaria a fórmula de negócio em
+// dois lugares que podem divergir — por isso ela deixou de ser a fonte da
+// prévia de fechamento (ver fetchCashClosePreview()/updateCashCloseSummary()
+// abaixo, que agora consultam GET /v1/cash-sessions/:id/close-preview).
+//
+// Consumidor restante: closeCashSession() — só como valor local de
+// exibição otimista/fallback de countedAmount nos fechamentos "rápidos"
+// (#pdvCloseCashBtn, window.closePDVCashFlow, botão de openPDVExitOptions()
+// em app.js), que não passam pelo fluxo dedicado de conferência e por isso
+// não têm uma prévia buscada previamente. O valor PERSISTIDO de
+// expectedAmount nunca vem daqui em nenhum caminho — é sempre recalculado
+// no servidor (closeCashController -> calculateExpectedCashAmount()) e
+// sobrescreve este valor local assim que a resposta do backend chega. Não
+// alterado nesta emenda: mexer nos caminhos rápidos está fora de escopo
+// (ver docs/staging-final-checklist.md).
+function getSessionSalesTotal() {
+  const sales = Array.isArray(state.sales) ? state.sales : [];
+  const sessionId = state.cashSession?.id;
+  if (!sessionId) return 0;
+
+  return sales.reduce((acc, sale) => {
+    if (sale?.cancelled || sale?.isCancelled || sale?.status === 'cancelled') return acc;
+    if (String(sale?.cashSessionId || '') !== String(sessionId)) return acc;
 
     return acc + Number(sale.total || 0);
   }, 0);
@@ -262,18 +308,83 @@ function setCashDifferenceVisual(difference) {
   differenceBox.classList.add('is-shortage');
 }
 
+// Emenda Final Pré-Checkpoint (ALTO C, C3 CONFIRMADO) — a prévia do fluxo
+// dedicado de conferência (#cashCloseConferenceModal) deixa de reconstruir
+// expectedAmount localmente a partir de state.sales. Ela passa a vir de
+// GET /v1/cash-sessions/:id/close-preview (mesma função autoritativa —
+// calculateExpectedCashAmount() — que closeCashController usa para
+// persistir o fechamento real). Isso elimina a divergência que existia
+// entre o número mostrado ao operador ANTES de confirmar e o número que o
+// backend efetivamente gravava DEPOIS de confirmar (ex.: sessão com venda
+// mista cash 30 + pix 70: prévia local somava 100, backend sempre somou 30).
+//
+// _lastClosePreview: { cashSessionId, openingAmount, cashSalesAmount, expectedAmount } | null
+// _closePreviewError: string | null — presença bloqueia a confirmação do
+// fechamento (ver requestProtectedCashClose()). NUNCA cai para
+// getSessionSalesTotal() como fallback em caso de falha — mostrar erro
+// explícito é o comportamento correto aqui, não inventar um valor local.
+let _lastClosePreview = null;
+let _closePreviewError = null;
+
+async function fetchCashClosePreview() {
+  _lastClosePreview = null;
+  _closePreviewError = null;
+
+  const sessionId = state.cashSession?.id;
+  if (!sessionId) {
+    _closePreviewError = 'Sessão de caixa sem identificador — não é possível obter o saldo esperado do servidor.';
+    return;
+  }
+
+  try {
+    const preview = await getCashClosePreviewService(sessionId);
+    if (!preview) {
+      _closePreviewError = 'Não foi possível obter o saldo esperado do servidor. Tente novamente.';
+      return;
+    }
+    _lastClosePreview = preview;
+  } catch (error) {
+    _closePreviewError = error?.message || 'Não foi possível obter o saldo esperado do servidor. Tente novamente.';
+  }
+}
+
 function updateCashCloseSummary() {
   const openingEl = document.getElementById('cashCloseOpeningValue');
   const salesEl = document.getElementById('cashCloseSalesValue');
   const expectedEl = document.getElementById('cashCloseExpectedValue');
   const statusEl = document.getElementById('cashCloseStatusLabel');
   const countedInput = document.getElementById('cashCountedAmount');
+  const closeBtn = document.getElementById('closeCashBtn');
 
   if (!openingEl || !salesEl || !expectedEl || !statusEl) return;
 
-  const opening = Number(state.cashSession?.openingAmount || 0);
-  const salesTotal = getTodayValidSalesTotal();
-  const expected = opening + salesTotal;
+  // Bloqueia a confirmação enquanto o valor autoritativo não estiver
+  // disponível (Emenda Final Pré-Checkpoint, Seção 10.1) — nunca habilitar
+  // o fechamento com base em um cálculo local de substituição.
+  if (closeBtn) closeBtn.disabled = !_lastClosePreview || Boolean(_closePreviewError);
+
+  if (_closePreviewError) {
+    openingEl.textContent = '—';
+    salesEl.textContent = '—';
+    expectedEl.textContent = '—';
+    statusEl.textContent = 'Erro ao obter saldo esperado';
+    setCashDifferenceVisual(0);
+    const diffValueEl = document.getElementById('cashDifferenceValue');
+    if (diffValueEl) diffValueEl.textContent = '—';
+    return;
+  }
+
+  if (!_lastClosePreview) {
+    openingEl.textContent = '—';
+    salesEl.textContent = '—';
+    expectedEl.textContent = '—';
+    statusEl.textContent = 'Carregando saldo esperado...';
+    return;
+  }
+
+  const opening = Number(_lastClosePreview.openingAmount || 0);
+  const salesTotal = Number(_lastClosePreview.cashSalesAmount || 0);
+  const expected = Number(_lastClosePreview.expectedAmount || 0);
   const counted = Number(countedInput?.value || 0);
   const difference = counted - expected;
 
@@ -1025,7 +1136,7 @@ export async function closeCashSession() {
   window.__pdvCashCloseAuthorized = false; // consumir token one-time
 
   const summary = getFinanceSummary?.() || { currentBalance: 0 };
-  const salesTotal = getTodayValidSalesTotal();
+  const salesTotal = getSessionSalesTotal();
   const openingAmount = Number(state.cashSession?.openingAmount || 0);
   const expectedAmount = openingAmount + salesTotal;
   const countedValue = Number(document.getElementById('cashCountedAmount')?.value || expectedAmount || 0);
@@ -1269,6 +1380,14 @@ function requestProtectedCashClose() {
     return;
   }
 
+  // Emenda Final Pré-Checkpoint (C3): bloqueia a confirmação enquanto o
+  // saldo esperado autoritativo (backend) não tiver sido obtido com
+  // sucesso — nunca prosseguir com um cálculo local de substituição.
+  if (_closePreviewError || !_lastClosePreview) {
+    showToast(_closePreviewError || 'Aguarde o saldo esperado do servidor antes de confirmar.', 'warning');
+    return;
+  }
+
   // Vazio (string) é "não informado" — diferente de "0", que é uma contagem
   // legítima (caixa conferido e vazio). Nunca usar expectedAmount como
   // fallback aqui: é exatamente o comportamento que causava o bloqueador
@@ -1315,17 +1434,22 @@ function _resetCashCountedField() {
   if (diffValueEl) diffValueEl.textContent = '—';
 }
 
-export function openCashCloseConferenceModal() {
+export async function openCashCloseConferenceModal() {
   if (!state.cashSession?.isOpen) {
     showToast('Nenhum caixa aberto para fechar.', 'warning');
     return;
   }
 
   _resetCashCountedField();
-  updateCashCloseSummary();
+  _lastClosePreview = null;
+  _closePreviewError = null;
+  updateCashCloseSummary(); // renderiza estado "Carregando..." imediatamente
 
   document.getElementById('cashCloseConferenceModal')?.classList.remove('hidden');
   setTimeout(() => document.getElementById('cashCountedAmount')?.focus(), 80);
+
+  await fetchCashClosePreview();
+  updateCashCloseSummary();
 }
 
 export function hideCashCloseConferenceModal() {
@@ -1528,7 +1652,13 @@ export function bindCashSessionActions() {
 
   document.getElementById('resetCashBtn')?.addEventListener('click', resetCashSession);
   document.getElementById('cashCountedAmount')?.addEventListener('input', updateCashCloseSummary);
-  document.getElementById('previewCashCloseBtn')?.addEventListener('click', updateCashCloseSummary);
+  // "Atualizar resumo": busca a prévia de novo no backend (não só
+  // re-renderiza o valor em cache) — cobre o caso de vendas novas terem
+  // entrado na sessão enquanto o modal estava aberto.
+  document.getElementById('previewCashCloseBtn')?.addEventListener('click', async () => {
+    await fetchCashClosePreview();
+    updateCashCloseSummary();
+  });
   document.getElementById('printCashCloseBtn')?.addEventListener('click', printCashCloseReport);
 
   // Fase 3.1a — abre/fecha o modal de conferência. #pdvCloseCashBtn (Alt+X,

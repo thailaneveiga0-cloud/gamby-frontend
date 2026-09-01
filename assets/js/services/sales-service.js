@@ -141,6 +141,16 @@ function normalizeOutgoingSalePayload(payload = {}) {
     // customerId, isDelivery, discountType omitidos se não informados
     ...(payload.customerId  ? { customerId:  optStr(payload.customerId)  } : {}),
     ...(payload.discountType ? { discountType: payload.discountType } : {}),
+    // Fase 3.1a-bis (C2): composição por forma de pagamento (venda mista).
+    // Re-normaliza cada method com a implementação real — nunca confia que o
+    // chamador já normalizou. Omitido quando ausente (backend deriva uma
+    // única linha a partir de paymentMethod nesse caso).
+    ...(Array.isArray(payload.payments) && payload.payments.length
+      ? { payments: payload.payments.map((p) => ({
+            method: normalizePaymentMethod(p.method),
+            amount: toNumber(p.amount, 0)
+          })) }
+      : {}),
   };
 }
 

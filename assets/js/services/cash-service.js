@@ -65,6 +65,25 @@ export async function closeCashSessionService(cashSessionId, payload) {
   });
 }
 
+// Fase 3.1a-bis (ALTO C, C3): prévia autoritativa do saldo esperado antes do
+// fechamento — GET /v1/cash-sessions/:id/close-preview, mesma fórmula
+// (calculateExpectedCashAmount) que o backend usa no fechamento real. Só
+// leitura, não persiste nada. Retorna null quando o backend não está
+// disponível (mesma convenção dos serviços acima) — quem chamar NÃO deve
+// usar isso como sinal para recalcular localmente (ver cash-session.js,
+// openCashCloseConferenceModal()/updateCashCloseSummary()): falha aqui deve
+// bloquear a conferência com erro explícito, nunca cair para
+// getSessionSalesTotal().
+export async function getCashClosePreviewService(cashSessionId) {
+  if (!isBackendReady()) return null;
+
+  if (!cashSessionId) {
+    throw new Error('ID da sessão de caixa não informado.');
+  }
+
+  return httpRequest(buildEndpoint('cashSessions', `${cashSessionId}/close-preview`));
+}
+
 export async function reopenCashSessionService(payload = {}) {
   if (!isBackendReady()) return null;
 

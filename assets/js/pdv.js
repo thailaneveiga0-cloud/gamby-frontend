@@ -10,7 +10,8 @@ import { clearActiveProfile, showProfileSelector } from './profile-selector.js';
 import {
   createSaleService,
   cancelSaleService,
-  loadSales
+  loadSales,
+  normalizePaymentMethod
 } from './services/sales-service.js';
 import { getScaleConfigService } from './services/scale-service.js';
 
@@ -1163,10 +1164,25 @@ function _openPaymentModal() {
     const parcNotes = parcelas.map(p => `${p.method}: ${formatCurrency(p.value)}`).join(' | ');
     const notesExtra = parcelas.length > 1 ? `Pagamento misto — ${parcNotes}` : (isAPrazo ? 'A prazo' : null);
 
+    // Fase 3.1a-bis (C2): a composição real (parcelas) só é enviada quando há
+    // mais de uma parcela — é exatamente quando paymentMethod vira 'Misto'/
+    // 'mixed' acima. Para 1 parcela, o backend já deriva uma única linha a
+    // partir de paymentMethod (sales.service.js) — não precisa duplicar.
+    // Usa a implementação REAL de normalização (normalizePaymentMethod, de
+    // sales-service.js) — nunca o mapa duplicado/morto _pmToBackend deste
+    // arquivo.
+    const paymentsComposition = parcelas.length > 1
+      ? parcelas.map(p => ({
+          method: normalizePaymentMethod(p.method),
+          amount: Number(p.value)
+        }))
+      : null;
+
     _closePaymentModal();
     try {
       const payload = buildSalePayload();
       if (notesExtra) payload.notes = notesExtra;
+      if (paymentsComposition) payload.payments = paymentsComposition;
       // Troco — só conta se houver dinheiro
       payload.changeAmount = troco();
       payload.amountReceived = somaPaga();
