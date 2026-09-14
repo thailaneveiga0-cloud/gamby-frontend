@@ -115,13 +115,6 @@ function applyCpfMask(input) {
   });
 }
 
-function autoFillPin(cpfInput, pinInput) {
-  cpfInput.addEventListener('blur', () => {
-    const d = cpfInput.value.replace(/\D/g, '');
-    if (d.length === 11 && !pinInput.value) pinInput.value = d.slice(-4);
-  });
-}
-
 function showFormError(formId, msg) {
   document.querySelector(`#${formId} .tm-error`)?.remove();
   const p = document.createElement('p');
@@ -157,7 +150,7 @@ export function showTerminalSetupModal() {
             <input id="tmSetupOpCpf" type="text" placeholder="000.000.000-00" maxlength="14" inputmode="numeric" />
           </label>
           <label>Senha / PIN
-            <small class="tm-hint">4 últimos dígitos do CPF — preenchido automaticamente</small>
+            <small class="tm-hint">Opcional — defina um PIN numérico para identificação neste terminal</small>
             <input id="tmSetupOpPin" type="password" placeholder="••••" maxlength="6" inputmode="numeric" />
           </label>
           <label class="tm-toggle-label">
@@ -176,7 +169,6 @@ export function showTerminalSetupModal() {
     const cpfIn = document.getElementById('tmSetupOpCpf');
     const pinIn = document.getElementById('tmSetupOpPin');
     applyCpfMask(cpfIn);
-    autoFillPin(cpfIn, pinIn);
 
     setTimeout(() => document.getElementById('tmSetupTerminalName')?.focus(), 80);
 
@@ -201,14 +193,15 @@ export function showTerminalSetupModal() {
         return;
       }
 
-      const cpfDigits = opCpf.replace(/\D/g, '');
-      const pinRaw    = pinIn.value.trim();
+      const pinRaw = pinIn.value.trim();
       // PIN deve ser numérico 4-6 dígitos. Se digitado texto (ex: senha de login), rejeitar.
       if (pinRaw && !/^\d{4,6}$/.test(pinRaw)) {
         showFormError('tmSetupForm', 'PIN deve ter entre 4 e 6 dígitos numéricos. O PIN não pode ser uma senha de texto.');
         return;
       }
-      const pin = pinRaw || cpfDigits.slice(-4);
+      // M005-B (B3): PIN não é mais derivado automaticamente do CPF —
+      // fica vazio até o operador digitar um valor explícito.
+      const pin = pinRaw;
 
       const terminal = registerTerminal({
         name: termName,
@@ -266,7 +259,6 @@ export function showOperatorIdentModal(terminal) {
     const cpfIn = document.getElementById('tmOpCpf');
     const pinIn = document.getElementById('tmOpPin');
     applyCpfMask(cpfIn);
-    autoFillPin(cpfIn, pinIn);
 
     setTimeout(() => document.getElementById('tmOpName')?.focus(), 80);
 
@@ -302,7 +294,8 @@ export function showOperatorIdentModal(terminal) {
         showFormError('tmOpForm', 'PIN deve ter entre 4 e 6 dígitos numéricos.');
         return;
       }
-      const pin = pinRaw || cpf.replace(/\D/g, '').slice(-4);
+      // M005-B (B3): PIN não é mais derivado automaticamente do CPF.
+      const pin = pinRaw;
       closeOverlay('tmOperatorOverlay');
       resolve({ name, cpf, pin });
     });
@@ -343,7 +336,6 @@ function showChangeOperatorModal(terminal) {
     const cpfIn = document.getElementById('tmChOpCpf');
     const pinIn = document.getElementById('tmChOpPin');
     applyCpfMask(cpfIn);
-    autoFillPin(cpfIn, pinIn);
 
     document.getElementById('tmChOpCancelBtn').addEventListener('click', () => {
       closeOverlay('tmChangeOpOverlay');
@@ -358,7 +350,8 @@ function showChangeOperatorModal(terminal) {
         showFormError('tmChOpForm', 'Preencha nome e CPF válido.');
         return;
       }
-      const pin = pinIn.value.trim() || cpf.replace(/\D/g, '').slice(-4);
+      // M005-B (B3): PIN não é mais derivado automaticamente do CPF.
+      const pin = pinIn.value.trim();
       updateTerminal(terminal.id, {
         lastOperatorName: name,
         lastOperatorCpf: cpf,

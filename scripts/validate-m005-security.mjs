@@ -1,18 +1,26 @@
 /**
- * Gamby Frontend — M005 Security Validation (D1 + D2)
+ * Gamby Frontend — M005 / M005-B Security Validation (D1 + D2 + B3)
  *
  * D1: controlPin/controlPassword não podem mais ser derivados automaticamente
  *     do CPF em assets/js/user-management.js (criação, edição, fallback
  *     local, payloads persistentes).
  * D2: os textos visíveis do modal de autorização (assets/js/app.js) não
  *     podem instruir o usuário a usar dígitos do CPF como credencial.
+ * B3 (M005-B): assets/js/terminal-manager.js não pode mais derivar
+ *     automaticamente um "PIN de operador" a partir do CPF (autoFillPin() e
+ *     os três fallbacks pin = ... || cpfDigits.slice(-4) nos modais de
+ *     setup/identificação/troca de operador do terminal) — achado
+ *     confirmado como fluxo vivo (código executável, não comentário morto),
+ *     mesmo o valor derivado nunca chegando a ser transmitido ao backend
+ *     como credencial (openCashSessionService descarta o campo antes do
+ *     envio — ver relatório M005-B, Gate B3).
  *
  * Este repositório não tem framework de teste instalado (ver package.json).
  * Este script lê o CÓDIGO-FONTE REAL como texto e verifica contratos
  * estáticos fortes (contagem de call-sites reais, extração dos argumentos
  * reais passados às funções de serviço, extração do template literal real
- * do modal) — a implementação de user-management.js/app.js não é copiada
- * nem reescrita aqui.
+ * do modal) — a implementação de user-management.js/app.js/terminal-manager.js
+ * não é copiada nem reescrita aqui.
  *
  * Usage: node scripts/validate-m005-security.mjs
  * Exit code 1 se qualquer cenário falhar.
@@ -26,6 +34,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const USER_MGMT = join(ROOT, 'assets/js/user-management.js');
 const APP_JS = join(ROOT, 'assets/js/app.js');
+const TERMINAL_MGR = join(ROOT, 'assets/js/terminal-manager.js');
 
 let failed = 0;
 
@@ -145,13 +154,38 @@ async function main() {
     openModalBody === null ? 'função não encontrada' : (/CPF/i.test(openModalBody) ? 'texto "CPF" ainda presente' : 'sem menção a CPF')
   );
 
+  // ── B3 (M005-B) ────────────────────────────────────────────────────────
+
+  const terminalMgrSrc = await readFile(TERMINAL_MGR, 'utf8');
+
+  const autoFillPinSites = (terminalMgrSrc.match(/autoFillPin\s*\(/g) || []).length;
+  check(
+    'B3: autoFillPin (auto-preenchimento de PIN a partir do CPF) não tem call-sites nem definição em terminal-manager.js',
+    autoFillPinSites === 0,
+    `${autoFillPinSites} ocorrência(s) encontrada(s)`
+  );
+
+  const cpfSliceFallbacks = (terminalMgrSrc.match(/\.slice\(-4\)/g) || []).length;
+  check(
+    'B3: nenhum fallback de PIN derivado dos últimos 4 dígitos do CPF (.slice(-4)) em terminal-manager.js',
+    cpfSliceFallbacks === 0,
+    `${cpfSliceFallbacks} ocorrência(s) encontrada(s)`
+  );
+
+  const cpfAsPinText = /últimos\s*4.*CPF|4\s*últimos.*CPF/i.test(terminalMgrSrc);
+  check(
+    'B3: nenhum texto visível em terminal-manager.js instrui CPF como PIN/credencial',
+    !cpfAsPinText,
+    cpfAsPinText ? 'texto "N últimos dígitos do CPF" ainda presente' : 'sem menção a CPF como PIN'
+  );
+
   console.log('');
   if (failed > 0) {
     console.error(`${failed} cenário(s) falharam.\n`);
     process.exit(1);
   }
 
-  console.log('Todos os contratos D1/D2 confirmados no código-fonte real.\n');
+  console.log('Todos os contratos D1/D2/B3 confirmados no código-fonte real.\n');
 }
 
 main().catch((err) => {
