@@ -304,7 +304,7 @@ function openSecureCashCloseModal(onSuccess, opts = {}) {
           <span class="sc-modal-badge">Ação protegida</span>
           <h3 class="sc-modal-title">Autorização necessária</h3>
           <p class="sc-modal-sub">
-            Digite a senha do gerente (4 últimos dígitos do CPF) ou do administrador.
+            Digite a credencial de autorização do gerente ou do administrador.
           </p>
         </div>
         <button id="closeSecureCashActionBtn" type="button" class="sc-close-btn">×</button>
@@ -313,7 +313,7 @@ function openSecureCashCloseModal(onSuccess, opts = {}) {
         <label for="secureCashPassword" class="sc-modal-label">Senha</label>
         <input id="secureCashPassword" type="password" placeholder="Digite a senha autorizada" class="sc-modal-input" />
       </div>
-      <div id="secureCashActionMessage" class="sc-modal-msg">Gerente: últimos 4 dígitos do CPF. Administrador: senha livre configurada nas configurações do PDV.</div>
+      <div id="secureCashActionMessage" class="sc-modal-msg">Gerente: PIN de autorização configurado em Usuários. Administrador: senha configurada nas configurações do PDV.</div>
       <div class="sc-modal-actions">
         <button id="confirmSecureCashActionBtn" type="button" class="sc-btn-confirm">Confirmar</button>
         <button id="cancelSecureCashActionBtn" type="button" class="sc-btn-cancel">Cancelar</button>

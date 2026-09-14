@@ -39,12 +39,6 @@ function maskCPF(value = '') {
   return `${cpf.slice(0, 3)}.***.***-${cpf.slice(-2)}`;
 }
 
-function buildControlPasswordFromCPF(cpf = '') {
-  const cleanCpf = normalizeCPF(cpf);
-  if (cleanCpf.length < 4) return '';
-  return cleanCpf.slice(-4);
-}
-
 function roleCanHaveControlPassword(role = '') {
   const normalized = String(role || '').trim().toLowerCase();
   return ['gerente', 'administrador', 'desenvolvedora', 'operador'].includes(normalized);
@@ -291,10 +285,10 @@ function mapBackendUserToInternalUser(user) {
     email: user?.email || '',
     password: '••••••',
     controlPassword: roleCanHaveControlPassword(normalizedRole)
-      ? (user?.controlPin || buildControlPasswordFromCPF(rawCpf))
+      ? (user?.controlPin || '')
       : '',
     controlPin: roleCanHaveControlPassword(normalizedRole)
-      ? (user?.controlPin || buildControlPasswordFromCPF(rawCpf))
+      ? (user?.controlPin || '')
       : '',
     cpf: rawCpf,
     cpfMasked: user?.cpf || (rawCpf ? maskCPF(rawCpf) : ''),
@@ -319,10 +313,10 @@ function mapLocalUser(user) {
     email: user?.email || user?.username || '',
     password: user?.password || '••••••',
     controlPassword: roleCanHaveControlPassword(normalizedRole)
-      ? (user?.controlPassword || user?.controlPin || buildControlPasswordFromCPF(rawCpf))
+      ? (user?.controlPassword || user?.controlPin || '')
       : '',
     controlPin: roleCanHaveControlPassword(normalizedRole)
-      ? (user?.controlPin || user?.controlPassword || buildControlPasswordFromCPF(rawCpf))
+      ? (user?.controlPin || user?.controlPassword || '')
       : '',
     cpf: rawCpf,
     cpfMasked: user?.cpfMasked || (rawCpf ? maskCPF(rawCpf) : ''),
@@ -409,24 +403,17 @@ function clearUserForm() {
 }
 
 function updateControlPasswordPreview() {
-  const roleEl = document.getElementById('newInternalRole');
-  const cpfEl = document.getElementById('newInternalCpf');
+  // M005 (D1): a credencial de controle não é mais derivada do CPF, então
+  // não há mais nada para pré-visualizar aqui — ela só existe depois de
+  // definida explicitamente pelo próprio usuário (POST /v1/users/me/control-pin
+  // ou /me/admin-password). O preview fica sempre oculto; os elementos do
+  // DOM são mantidos (podem ser reaproveitados por uma UI futura de
+  // definição explícita de credencial).
   const wrapEl = document.getElementById('controlPasswordPreviewWrap');
   const previewEl = document.getElementById('controlPasswordPreview');
 
-  if (!roleEl || !cpfEl || !wrapEl || !previewEl) return;
-
-  const role = normalizeRole(roleEl.value || '');
-  const cpf = cpfEl.value || '';
-
-  if (!roleCanHaveControlPassword(role)) {
-    wrapEl.classList.add('hidden');
-    previewEl.value = '';
-    return;
-  }
-
-  wrapEl.classList.remove('hidden');
-  previewEl.value = buildControlPasswordFromCPF(cpf);
+  if (wrapEl) wrapEl.classList.add('hidden');
+  if (previewEl) previewEl.value = '';
 }
 
 function confirmAction(message) {
@@ -478,9 +465,7 @@ function openEditUserModalById(userId) {
   applyEditControlPasswordVisibility(
     user.role,
     user.cpf || '',
-    roleCanHaveControlPassword(user.role)
-      ? (user.controlPin || buildControlPasswordFromCPF(user.cpf || ''))
-      : ''
+    roleCanHaveControlPassword(user.role) ? (user.controlPin || '') : ''
   );
 
   if (modal) {
@@ -632,7 +617,11 @@ export async function addInternalUser() {
       password,
       role,
       cpf: normalizeCPF(cpf),
-      controlPin: buildControlPasswordFromCPF(cpf),
+      // M005 (D1): controlPin não é mais preenchido automaticamente a
+      // partir do CPF. Sem entrada explícita do usuário nesta tela, o
+      // campo fica ausente do payload — o backend mantém a credencial
+      // como null até ser definida via POST /v1/users/me/control-pin
+      // (gerente) ou /me/admin-password (admin).
       photoUrl: newPhotoUrl,
       isActive
     });
@@ -676,8 +665,6 @@ export async function addInternalUser() {
       cpf: normalizeCPF(cpf),
       cpfMasked: maskCPF(cpf),
       role,
-      controlPassword: buildControlPasswordFromCPF(cpf),
-      controlPin: buildControlPasswordFromCPF(cpf),
       photoUrl: newPhotoUrl,
       isActive: true,
       emailVerified: true
@@ -745,6 +732,11 @@ async function saveEditedUser() {
     ? (_pendingEditUserPhoto || null)
     : (current.photoUrl || null);
 
+  // M005 (D1): editar nome/e-mail/CPF/role nunca recalcula controlPin/
+  // controlPassword — nextUser preserva o valor atual via ...current (nada
+  // é derivado do CPF aqui) e o payload de updateUserService não envia a
+  // chave controlPin, para que o backend preserve o valor já configurado
+  // (existing.controlPin quando a chave está ausente do body).
   const nextUser = {
     ...current,
     name,
@@ -753,12 +745,6 @@ async function saveEditedUser() {
     role,
     cpf,
     cpfMasked: maskCPF(cpf),
-    controlPassword: roleCanHaveControlPassword(role)
-      ? buildControlPasswordFromCPF(cpf)
-      : '',
-    controlPin: roleCanHaveControlPassword(role)
-      ? buildControlPasswordFromCPF(cpf)
-      : '',
     photoUrl: resolvedPhoto,
     updatedAt: new Date().toISOString()
   };
@@ -769,7 +755,6 @@ async function saveEditedUser() {
       email,
       role,
       cpf,
-      controlPin: nextUser.controlPin,
       photoUrl: resolvedPhoto
     });
 
