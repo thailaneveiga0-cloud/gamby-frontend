@@ -4,29 +4,34 @@
  * Camada puramente visual sobre uma sessão já autenticada (JWT inalterado).
  * Deixa o usuário logado (administrador/developer_master) escolher "como" vai
  * navegar hoje — Administrador, Gerente ou Operador — sem precisar de outra
- * senha. Operador/Gerente exigem confirmação por PIN (4 dígitos do CPF) antes
- * de liberar o perfil.
+ * senha... exceto que Gerente/Operador NÃO pulam autenticação real: exigem
+ * confirmação de identidade via a API real de OperatorPin do PDV (Fase 3.1b)
+ * — o mesmo mecanismo já usado por operator-session.js/pin-service.js
+ * (POST /v1/pdv/operator-pin/switch), nunca comparação local.
  *
- * O PIN nunca é enviado ao backend: é validado localmente contra o campo
- * `controlPin` já retornado (sem máscara) por GET /v1/users — o mesmo campo
- * usado hoje pela identificação de operador no PDV (últimos 4 dígitos do CPF).
- * O CPF completo nunca chega ao frontend (a API sempre retorna mascarado),
- * então essa é a única validação local possível sem alterar o backend — por
- * isso o mesmo campo/convenção é reaproveitado também para Gerente.
+ * O PIN é sempre enviado ao backend para validação (nunca comparado no
+ * frontend). A lista de candidatos vem de GET /v1/pdv/operators
+ * (listOperatorsService), que devolve só `hasPin` (booleano, não-segredo) —
+ * nunca o PIN nem qualquer valor derivado de CPF. A identidade usada para
+ * ativar o perfil é sempre a devolvida pelo backend na resposta de sucesso,
+ * nunca o objeto local que o usuário clicou na lista.
  *
- * state.activeProfile (ver state.js) é o estado novo deste módulo — controla
- * apenas visibilidade de menu/página (gov-access.getCurrentRole()).
+ * state.activeProfile (ver state.js) é o estado deste módulo — controla
+ * apenas visibilidade de menu/página (gov-access.getCurrentRole()). Nunca
+ * contém PIN nem qualquer credencial.
  * state.currentOperator já existia antes e representa "quem está fisicamente
  * no caixa do PDV". Ao confirmar o PIN de um perfil Operador/Gerente, este
- * módulo TAMBÉM popula state.currentOperator com os dados do mesmo usuário —
- * é a mesma pessoa que acabou de se identificar, e sem isso
+ * módulo TAMBÉM popula state.currentOperator com a identidade retornada pelo
+ * backend — é a mesma pessoa que acabou de se identificar, e sem isso
  * startPDVOpenCashFlow() (modo controlled) pede identificação de novo. Não
  * confundir com state.activeProfile: um controla o que a pessoa VÊ, o outro
- * é registro de auditoria/turno de quem está OPERANDO o caixa.
+ * é registro de auditoria/turno de quem está OPERANDO o caixa — mas agora os
+ * dois só existem depois de uma validação real de backend.
  */
 
 import { state } from './state.js';
 import { listUsersService } from './services/user-service.js';
+import { listOperatorsService, loginWithPinService } from './services/pin-service.js';
 import { getRoleLabel } from './roles.js';
 import { applyRoleVisibility } from './ui.js';
 import { applyVisibility as govApplyVisibility, getDefaultPage as govGetDefaultPage, canNavigate as govCanNavigate } from './gov-access.js';
@@ -38,6 +43,7 @@ const ACTIVE_PROFILE_KEY = 'gamby_active_profile';
 const SELECTABLE_PROFILES = ['administrador', 'gerente', 'operador'];
 
 let _companyUsers = [];
+let _roleUsers = [];
 let _pendingUser = null;
 let _pendingRole = null;
 
@@ -106,24 +112,16 @@ function _setActiveProfile(profile, userId, name, extra = {}) {
 
 /* ================= DADOS ================= */
 
+// Fase 3.1b: lista vem de GET /v1/pdv/operators (listOperatorsService), não
+// mais de GET /v1/users — esse endpoint é o dedicado do PDV, tenant-scoped,
+// e devolve hasPin (booleano não-secreto) em vez de qualquer credencial.
+// Devolve TODOS os usuários do papel pedido (mesmo sem PIN configurado
+// ainda) — quem decide o que fazer com hasPin===false é a UI (ver
+// _renderUserStep), não este helper.
 export async function loadProfileUsers(role) {
-  if (!Array.isArray(_companyUsers) || !_companyUsers.length) {
-    _companyUsers = await listUsersService().catch(() => []);
-  }
+  const operators = await listOperatorsService().catch(() => []);
   const target = String(role || '').toLowerCase();
-  return _companyUsers.filter((u) =>
-    String(u.role || '').toLowerCase() === target &&
-    u.isActive !== false &&
-    Boolean(u.controlPin)
-  );
-}
-
-// PIN local: compara contra controlPin (últimos 4 dígitos do CPF, já retornado
-// sem máscara pelo backend) — a mesma convenção usada pelo PDV para identificar
-// operadores. Nunca trafega senha/CPF ao backend.
-export function validateOperatorPin(user, pin) {
-  const typed = String(pin || '').trim();
-  return typed.length === 4 && Boolean(user?.controlPin) && typed === String(user.controlPin);
+  return operators.filter((op) => String(op.role || '').toLowerCase() === target);
 }
 
 /* ================= RESTRIÇÕES DE VISIBILIDADE ================= */
@@ -285,6 +283,7 @@ async function _openUserStep(role) {
   _showStep('psStepUser');
 
   const users = await loadProfileUsers(role);
+  _roleUsers = users;
 
   if (!list) return;
 
@@ -293,15 +292,25 @@ async function _openUserStep(role) {
     return;
   }
 
+  // hasPin===false: fail-closed (Fase 3.1b, P24/P56) — o botão fica marcado
+  // e o clique mostra uma mensagem em vez de abrir a etapa de PIN. Nunca
+  // criar um PIN automático nem liberar o perfil sem credencial real.
   list.innerHTML = users.map((u) => `
-    <button type="button" class="ps-user-btn" data-ps-user-id="${_esc(u.id)}">
+    <button type="button" class="ps-user-btn${u.hasPin ? '' : ' ps-user-btn-no-pin'}" data-ps-user-id="${_esc(u.id)}">
       <span class="ps-user-avatar">${_esc(_initial(u.name))}</span>
-      <span class="ps-user-name">${_esc(u.name || 'Usuário')}</span>
+      <span class="ps-user-name">${_esc(u.name || 'Usuário')}${u.hasPin ? '' : ' <small>(sem PIN)</small>'}</span>
     </button>
   `).join('');
 }
 
 function _openPinStep(user) {
+  // Fail-closed (P24/P56): sem PIN configurado, nem abre a etapa de PIN —
+  // nunca inventar credencial nem liberar o perfil sem validação real.
+  if (!user?.hasPin) {
+    _toast('Este operador ainda não possui PIN configurado. Cadastre um PIN na aba Usuários.', 'error');
+    return;
+  }
+
   _pendingUser = user;
 
   const info = document.getElementById('psPinUserInfo');
@@ -327,42 +336,76 @@ function _shake(el) {
   el.classList.add('ps-shake');
 }
 
-function _confirmPin() {
+function _showPinStepError(message, input) {
+  _shake(document.getElementById('psStepPin'));
+  const errEl = document.getElementById('psPinError');
+  if (errEl) {
+    errEl.textContent = message || 'PIN incorreto. Tente novamente.';
+    errEl.classList.remove('hidden');
+  }
+  if (input) { input.value = ''; input.focus(); }
+}
+
+// Fase 3.1b: PIN é sempre validado no backend real (POST
+// /v1/pdv/operator-pin/login, via loginWithPinService) — nunca comparado
+// localmente. A identidade usada a partir daqui (id/name/role) é sempre a
+// devolvida pela resposta do servidor, nunca o objeto _pendingUser que só
+// serviu para o usuário escolher QUEM tentar autenticar.
+async function _confirmPin() {
   const input = document.getElementById('psPinInput');
+  const confirmBtn = document.getElementById('psPinConfirmBtn');
   const pin = input?.value || '';
 
-  if (!_pendingUser || !validateOperatorPin(_pendingUser, pin)) {
-    _shake(document.getElementById('psStepPin'));
-    document.getElementById('psPinError')?.classList.remove('hidden');
-    if (input) { input.value = ''; input.focus(); }
+  if (!_pendingUser) return;
+
+  if (!pin) {
+    _showPinStepError('Informe o PIN.', input);
     return;
   }
 
-  // O PIN aqui é o MESMO controlPin usado por requirePDVOperatorSession() no
-  // PDV — já foi verificado, então marcar a sessão como identificada evita um
+  if (confirmBtn) confirmBtn.disabled = true;
+
+  let operator = null;
+  try {
+    operator = await loginWithPinService(_pendingUser.id, pin);
+  } catch (err) {
+    // Mensagem real do backend (inclui tentativas restantes / minutos de
+    // bloqueio quando aplicável — ver operator-pin.service.js) — nunca
+    // reescrita ou suavizada aqui.
+    _showPinStepError(err?.message, input);
+    return;
+  } finally {
+    if (confirmBtn) confirmBtn.disabled = false;
+  }
+
+  if (!operator) {
+    _showPinStepError(null, input);
+    return;
+  }
+
+  // Já verificado pelo backend — marcar a sessão como identificada evita um
   // segundo prompt de identificação ao entrar no PDV logo em seguida (perfil
   // Operador cai direto lá).
   state.operatorPinValidated = true;
 
-  // Popula state.currentOperator com o MESMO usuário que acabou de confirmar
-  // o PIN — startPDVOpenCashFlow() (modo controlled) só pula direto para o
-  // modal de valor inicial quando currentOperator.name já está definido;
-  // sem isso, cai em checkTerminalBeforeCashOpen() e pede identificação de
-  // novo. Não é uma reintrodução da confusão que o header deste arquivo
-  // alertava — é o valor correto para o campo, já que é a mesma pessoa.
+  // Popula state.currentOperator com a identidade retornada pelo SERVIDOR
+  // (nunca com _pendingUser) — startPDVOpenCashFlow() (modo controlled) só
+  // pula direto para o modal de valor inicial quando currentOperator.name já
+  // está definido; sem isso, cai em checkTerminalBeforeCashOpen() e pede
+  // identificação de novo. Nenhum PIN/credencial é armazenado aqui — só
+  // identidade não-secreta.
   state.currentOperator = {
-    id: _pendingUser.id || null,
-    name: _pendingUser.name || 'Responsável',
-    role: _pendingUser.role || null,
-    cpf: _pendingUser.cpf || null,
-    controlPin: _pendingUser.controlPin || null,
+    id: operator.userId,
+    name: operator.name,
+    role: operator.role,
     startedAt: new Date().toISOString()
   };
   // state.currentOperator é in-memory — some no reload (F5). operator-session.js
   // (fluxo real de identificação no PDV) sempre persiste em 'gamby_current_operator'
-  // logo após identificar; este fluxo (seletor de perfil) não fazia isso, então um
-  // F5 na PDV perdia o operador confirmado e o modal de identificação reaparecia
-  // mesmo com PIN já validado e activeProfile ainda válido em sessionStorage.
+  // logo após identificar; este fluxo (seletor de perfil) espelha o mesmo
+  // comportamento, senão um F5 na PDV perdia o operador confirmado e o modal
+  // de identificação reaparecia mesmo com PIN já validado e activeProfile
+  // ainda válido em sessionStorage.
   try { localStorage.setItem('gamby_current_operator', JSON.stringify(state.currentOperator)); } catch {}
 
   // Sinaliza para o listener de 'gamby:profile-selected' (app.js) que esta é
@@ -380,7 +423,7 @@ function _confirmPin() {
   // deste fluxo) herdaria a exigência por engano.
   state._acessoAutorizadoPendingConfirm = false;
 
-  const profile = _setActiveProfile(_pendingUser.role, _pendingUser.id, _pendingUser.name);
+  const profile = _setActiveProfile(operator.role, operator.userId, operator.name);
   hideProfileSelector();
   window.dispatchEvent(new CustomEvent('gamby:profile-selected', { detail: profile }));
 }
@@ -556,7 +599,7 @@ export function bindProfileSelectorActions() {
     const btn = e.target.closest('[data-ps-user-id]');
     if (!btn) return;
     const userId = btn.dataset.psUserId;
-    const user = _companyUsers.find((u) => String(u.id) === String(userId));
+    const user = _roleUsers.find((u) => String(u.id) === String(userId));
     if (user) _openPinStep(user);
   });
 
@@ -571,7 +614,9 @@ export function bindProfileSelectorActions() {
   document.getElementById('psPinConfirmBtn')?.addEventListener('click', _confirmPin);
 
   document.getElementById('psPinInput')?.addEventListener('input', (e) => {
-    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4);
+    // Fase 3.1b (P8): OperatorPin aceita 4-6 dígitos, não só 4 — mesmo
+    // formato validado pelo backend (operator-pin.service.js).
+    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
     document.getElementById('psPinError')?.classList.add('hidden');
   });
 

@@ -241,25 +241,6 @@ export function shouldRequireSecurityChallenge(pageOrAction) {
   ].includes(value);
 }
 
-export function getCpfPinByRole(cpf, role = getCurrentRole()) {
-  const digits = String(cpf || '').replace(/\D/g, '');
-
-  if (!digits) return '';
-
-  const normalizedRole = normalize(role);
-
-  if (normalizedRole === ROLES.MANAGER) {
-    return digits.slice(0, 4);
-  }
-
-  return digits.slice(-4);
-}
-
-export function validateCpfPin(cpf, pin, role = getCurrentRole()) {
-  const expected = getCpfPinByRole(cpf, role);
-  return Boolean(expected && String(pin || '').trim() === expected);
-}
-
 export function getSecurityQuestion() {
   return (
     localStorage.getItem('gamby_security_question') ||

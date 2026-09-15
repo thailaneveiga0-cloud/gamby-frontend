@@ -505,16 +505,14 @@ export async function requireOperatorSession(forcePin = false) {
     return true;
   }
 
-  // Rede de segurança adicional: perfil ativo definido pelo seletor pós-login
-  // (sessionStorage) já passou pela identificação equivalente — nunca reabrir
-  // o fluxo antigo de terminal/operador por cima de um perfil simulado, seja
-  // qual for o motivo de currentOperator/operatorPinValidated não estarem
-  // sincronizados no momento exato desta chamada.
-  if (sessionStorage.getItem('gamby_active_profile')) {
-    _d.exit = 'active_profile_bypass';
-    _d.sessionValidated = true;
-    return true;
-  }
+  // Fase 3.1b (P5): removido o bypass que tratava a mera PRESENÇA de
+  // sessionStorage['gamby_active_profile'] como prova de sessão operacional
+  // — activeProfile é só contexto visual (menu/página), nunca autoridade.
+  // O seletor de perfil (profile-selector.js) agora só popula
+  // state.currentOperator/operatorPinValidated depois de uma validação real
+  // via POST /v1/pdv/operator-pin/login, então o gate acima (já_set) já
+  // cobre corretamente o caso "perfil escolhido no seletor pós-login" — sem
+  // precisar confiar em activeProfile sozinho.
 
   const terminal = findTerminalByDevice();
   _d.findTerminalResult = terminal
