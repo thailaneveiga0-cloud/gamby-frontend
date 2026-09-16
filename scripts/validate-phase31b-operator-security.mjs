@@ -38,6 +38,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const PROFILE_SELECTOR = join(ROOT, 'assets/js/profile-selector.js');
 const OPERATOR_SESSION = join(ROOT, 'assets/js/operator-session.js');
+const CASH_SESSION = join(ROOT, 'assets/js/cash-session.js');
 
 let failed = 0;
 
@@ -69,6 +70,7 @@ async function main() {
 
   const psSrc = await readFile(PROFILE_SELECTOR, 'utf8');
   const osSrc = await readFile(OPERATOR_SESSION, 'utf8');
+  const csSrc = await readFile(CASH_SESSION, 'utf8');
 
   // ── F1/F2 ───────────────────────────────────────────────────────────────
 
@@ -144,13 +146,43 @@ async function main() {
     `${cpfSliceFallbacks} ocorrência(s)`
   );
 
+  // ── F15 (missão final — achado registrado em M005-B/Fase 3.1b) ───────────
+  // cash-session.js:handleClosedCashOpenNewCash() tinha a mesma instância do
+  // antipadrão removido de requireOperatorSession() (F11): a condição que
+  // decide se chama requirePDVOperatorSession() incluía _hasActiveProfile,
+  // pulando a identificação real sempre que activeProfile estivesse presente
+  // — mesmo sem operatorPinValidated. _hasActiveProfile continua existindo
+  // no arquivo para outro propósito (força reautenticação de senha admin),
+  // só não pode mais aparecer na condição que guarda a chamada de
+  // requirePDVOperatorSession().
+
+  const closedCashBody = extractFunctionBody(csSrc, 'handleClosedCashOpenNewCash');
+  let guardSnippet = null;
+  if (closedCashBody) {
+    // Busca a CHAMADA real (não uma menção em comentário/string) — a forma
+    // conhecida usada neste arquivo é sempre "await requirePDVOperatorSession(".
+    const callIdx = closedCashBody.indexOf('await requirePDVOperatorSession(');
+    if (callIdx !== -1) {
+      const ifIdx = closedCashBody.lastIndexOf('if (', callIdx);
+      guardSnippet = ifIdx !== -1 ? closedCashBody.slice(ifIdx, callIdx) : null;
+    }
+  }
+  const guardHasActiveProfileBypass = guardSnippet !== null && /_hasActiveProfile/.test(guardSnippet);
+  check(
+    'F15: cash-session.js/handleClosedCashOpenNewCash() não pula requirePDVOperatorSession() só por activeProfile estar presente',
+    guardSnippet !== null && !guardHasActiveProfileBypass,
+    closedCashBody === null
+      ? 'função não encontrada'
+      : (guardSnippet === null ? 'guarda de requirePDVOperatorSession não encontrada' : (guardHasActiveProfileBypass ? '_hasActiveProfile ainda presente na guarda' : '_hasActiveProfile ausente da guarda'))
+  );
+
   console.log('');
   if (failed > 0) {
     console.error(`${failed} cenário(s) falharam.\n`);
     process.exit(1);
   }
 
-  console.log('Todos os contratos F1-F5/F7-F9/F11-F12 confirmados no código-fonte real.\n');
+  console.log('Todos os contratos F1-F5/F7-F9/F11-F12/F15 confirmados no código-fonte real.\n');
 }
 
 main().catch((err) => {

@@ -1755,10 +1755,14 @@ window.handleClosedCashOpenNewCash = function handleClosedCashOpenNewCash() {
       dateTime:     new Date().toISOString()
     });
 
-    // Perfil ativo (seletor pós-login) já identificou o operador por uma UI
-    // diferente — nunca reabrir o modal antigo de identificação por cima
-    // disso, mesmo que operatorPinValidated não esteja setado por algum
-    // motivo pontual.
+    // _hasActiveProfile continua existindo só para _forceReauth (mais abaixo)
+    // — Fase 3.1b final: activeProfile sozinho NUNCA mais pode substituir
+    // operatorPinValidated no gate de identificação real do operador (mesmo
+    // antipadrão já removido de requireOperatorSession() em
+    // operator-session.js). Em modo controlado, a identificação real via
+    // requirePDVOperatorSession() é sempre exigida enquanto
+    // operatorPinValidated não estiver setado — activeProfile não entra
+    // mais nessa decisão.
     const _hasActiveProfile = Boolean(state.activeProfile);
     console.log('[CASH-OPEN-DEBUG] handleClosedCashOpenNewCash antes do gate de identificação', {
       isSimplified: _isSimplifiedPDV(),
@@ -1766,7 +1770,7 @@ window.handleClosedCashOpenNewCash = function handleClosedCashOpenNewCash() {
       currentOperatorName: state.currentOperator?.name || null,
       activeProfile: state.activeProfile?.profile || null,
     });
-    if (!_hasActiveProfile && !_isSimplifiedPDV() && !state.operatorPinValidated) {
+    if (!_isSimplifiedPDV() && !state.operatorPinValidated) {
       console.log('[CASH-OPEN-DEBUG] ⚠️ chamando requirePDVOperatorSession (modal antigo de identificação)');
       const ok = await requirePDVOperatorSession('cashClosedOpenCashBtn');
       if (!ok) return;
