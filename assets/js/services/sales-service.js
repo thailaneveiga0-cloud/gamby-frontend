@@ -122,6 +122,17 @@ function normalizeOutgoingSalePayload(payload = {}) {
     items,
     paymentMethod: normalizePaymentMethod(payload.paymentMethod),
     totalAmount,
+    // BUG REAL DE STAGING (2026-09-16): este campo nunca era incluído aqui,
+    // mesmo buildSalePayload() (pdv.js) sempre calculando amountReceived/
+    // amountPaid/changeAmount. Resultado real: toda venda em dinheiro
+    // chegava ao backend sem amountReceived -> amountPaid virava 0 em
+    // createSale() (sales.service.js) -> "amountPaid < total" sempre
+    // verdadeiro -> 422 "O valor recebido não pode ser menor que o total
+    // da venda", mesmo com o operador tendo digitado o valor certo no PDV.
+    // toNumber(..., undefined) omite a chave quando genuinamente ausente
+    // (Zod .optional() não aceita null, e JSON.stringify já remove chaves
+    // undefined — mesmo padrão de opt()/optStr() usados abaixo).
+    amountReceived: toNumber(payload.amountReceived ?? payload.amountPaid, undefined),
 
     // UUIDs opcionais: null → undefined (Zod rejeita null em _uuid().optional())
     cashSessionId: optStr(payload.cashSessionId ?? cashContext.cashSessionId),

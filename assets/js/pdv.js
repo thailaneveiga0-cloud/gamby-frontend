@@ -1188,7 +1188,10 @@ function _openPaymentModal() {
       payload.amountReceived = somaPaga();
       payload.amountPaid = somaPaga();
 
-      if (isMercadoPagoPDVMethod()) { await startMercadoPagoPaymentFlow(payload); return; }
+      // BUG REAL DE STAGING (2026-09-16): mesma correção do fluxo de
+      // pagamento único (finalizeSale) — a rota de pagamento Mercado Pago
+      // está desabilitada de propósito no backend (501); registrar a
+      // venda normalmente em vez de tentar abrir um pagamento ao vivo.
       await persistApprovedSale(payload);
     } catch (err) {
       showToast(err?.message || 'Erro ao finalizar venda.', 'error');
@@ -1760,11 +1763,15 @@ async function finalizeSale() {
   try {
     const payload = buildSalePayload();
 
-    if (isMercadoPagoPDVMethod()) {
-      await startMercadoPagoPaymentFlow(payload);
-      return;
-    }
-
+    // BUG REAL DE STAGING (2026-09-16): POST /v1/mercadopago/pdv-payment
+    // está desabilitada de propósito no backend (501 not_implemented — o
+    // valor não era validado contra uma venda real; ver
+    // mercadopago.routes.js). PIX/boleto/Mercado Pago QR/Point continuam
+    // registrando a venda normalmente por aqui, como qualquer outra forma
+    // de pagamento — sem tentar abrir um pagamento ao vivo pela integração
+    // desabilitada. A função de pagamento ao vivo e o detector de método
+    // Mercado Pago ficam sem caller neste fluxo (não reimplementados nem
+    // removidos nesta correção — fora de escopo).
     await persistApprovedSale(payload);
   } catch (error) {
     console.error('Erro ao finalizar venda:', error);
