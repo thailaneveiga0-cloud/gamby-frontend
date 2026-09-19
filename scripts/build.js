@@ -25,6 +25,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { createHash } from 'crypto';
+import { resolveBuildCommit, buildConfigJs } from './build-info.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -280,9 +281,11 @@ async function copyStatic() {
     }
     console.log(`[build] GAMBY_API_URL = ${apiUrl}`);
   }
+  const buildCommit = resolveBuildCommit();
+  console.log(`[build] BUILD COMMIT = ${buildCommit}`);
   await writeFile(
     join(DIST, 'assets/js/config.js'),
-    `window.GAMBY_CONFIG = { apiUrl: '${apiUrl}' };\n`,
+    buildConfigJs(apiUrl, buildCommit),
     'utf8'
   );
 
