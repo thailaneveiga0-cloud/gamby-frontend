@@ -163,6 +163,27 @@ export function applyProfileRestrictions(profile) {
 
   document.getElementById('switchProfileBtn')?.classList.remove('hidden');
 
+  // BUG REAL DE STAGING (2026-09-19), Bug D: o bloco "Fallback cirúrgico"
+  // abaixo só ADICIONA .hidden nesses seletores para o perfil Operador —
+  // nunca havia um caminho simétrico que os REMOVESSE ao trocar para
+  // Gerente/Administrador. releasePDVKioskMode() (chamada em outro ponto
+  // do fluxo de autorização) só desfaz as classes do <body>
+  // (pdv-kiosk-active/pdv-fullscreen), não estas .hidden aplicadas
+  // diretamente nos elementos — então a sidebar ficava escondida para
+  // sempre depois de um perfil Operador, mesmo trocando de perfil
+  // corretamente depois. Restaurado incondicionalmente aqui, no início,
+  // antes de qualquer decisão por role — mesmo padrão "fallback cirúrgico"
+  // já usado no bloco abaixo, só que no sentido inverso.
+  [
+    '#appSidebar', '#mainSidebar', '#sidebar',
+    '.app-sidebar', '.main-nav', '.nav-sidebar',
+    '[data-sidebar]', '.side-menu', '#sideMenu',
+    '.sidebar-hover-zone', '.sidebar-scrim', '.sidebar-toggle-btn',
+    '#pdvExitOptionsBtn', '#pdvSystemActionBtn',
+  ].forEach((sel) => {
+    document.querySelector(sel)?.classList.remove('hidden');
+  });
+
   // Chamada direta e explícita — não depende só da cadeia openPageDirect()
   // (que já chama isso para safePage==='pdv') chegar até o fim corretamente.
   // enforcePDVKioskMode() é idempotente (só seta flags/classes), então

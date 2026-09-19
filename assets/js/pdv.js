@@ -1195,6 +1195,20 @@ function _openPaymentModal() {
       await persistApprovedSale(payload);
     } catch (err) {
       showToast(err?.message || 'Erro ao finalizar venda.', 'error');
+
+      // BUG REAL DE STAGING (2026-09-19), Bug C: sel.value (setado acima
+      // para o backend receber paymentMethod) ficava preso no método da
+      // tentativa que falhou, mas o valor recebido da área inferior do PDV
+      // (#amountPaid) nunca foi sincronizado por este fluxo — o modal
+      // trabalha inteiramente com sua própria soma de parcelas
+      // (somaPaga()), nunca escreve nesse campo. Sem este reset, o próximo
+      // F10 lia essa combinação inconsistente (paymentMethod preenchido +
+      // #amountPaid vazio) e caía direto na checagem "valor recebido
+      // menor que o total" em vez de reabrir o modal de pagamento — a
+      // segunda tentativa nunca tinha as mesmas condições da primeira.
+      const amountEl = getAmountPaidEl();
+      if (sel) sel.value = '';
+      if (amountEl) amountEl.value = '';
     } finally {
       // Limpar option temporário
       getPaymentMethodField()?.querySelector('[data-temp]')?.remove();

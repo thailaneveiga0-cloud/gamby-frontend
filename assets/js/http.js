@@ -304,6 +304,24 @@ function shouldAttachAuth(url) {
   return !isPublicRoute(url);
 }
 
+// BUG REAL DE STAGING (2026-09-19), Bug A: rotas onde 401 significa
+// "credencial OPERACIONAL inválida" (PIN de operador incorreto —
+// operator-pin.service.js:loginWithPin), nunca "JWT expirado". Sem esta
+// exclusão, um PIN de operador digitado errado disparava o mesmo pipeline
+// de refresh-de-token/logout usado para JWT realmente expirado — e se o
+// refresh não se completasse com sucesso (por qualquer motivo), a sessão
+// da CONTA inteira era apagada por causa de um PIN de 4-6 dígitos errado,
+// sem relação nenhuma com o JWT.
+const _OPERATIONAL_401_ROUTES = [
+  '/v1/pdv/operator-pin/login',
+  '/v1/pdv/operator-pin/switch',
+];
+
+function isOperational401Route(url) {
+  const u = String(url || '');
+  return _OPERATIONAL_401_ROUTES.some(p => u.includes(p));
+}
+
 export async function httpRequest(url, options = {}) {
   const controller = new AbortController();
   const timeoutMs = Number(state.backend?.timeoutMs || 10000);
@@ -391,7 +409,7 @@ if (DEBUG_HTTP) {
     if (!response.ok) {
       const errorMessage = extractErrorMessage(payload, response.status);
 
-      if (response.status === 401 && !options._retried) {
+      if (response.status === 401 && !options._retried && !isOperational401Route(url)) {
         if (!_refreshPromise) {
           _refreshPromise = _tryRefreshToken().finally(() => { _refreshPromise = null; });
         }
