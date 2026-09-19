@@ -1,6 +1,7 @@
 import { state } from './state.js';
 import { KEYS } from './storage.js';
 import { resolveApiBaseUrl } from './backend-config.js';
+import { getOrCreateDeviceId } from './api.js';
 
 /* ======================================================
    HMAC REQUEST SIGNING
@@ -126,7 +127,12 @@ async function _tryRefreshToken() {
     const res = await fetch(`${baseUrl}/v1/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: session.refreshToken })
+      // O backend vincula a sessão a sha256(deviceId|ip|userAgent|...) calculado
+      // no login (que envia deviceId no body). O refresh precisa reenviar o
+      // MESMO deviceId (mesmo canal do login — refreshTokenSchema aceita
+      // deviceId), senão o hash recalculado nunca bate e todo refresh de uma
+      // sessão vinculada responde 401 device_mismatch → sessão derrubada.
+      body: JSON.stringify({ refreshToken: session.refreshToken, deviceId: getOrCreateDeviceId() })
     });
 
     if (!res.ok) return null;
