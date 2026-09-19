@@ -14,6 +14,8 @@ import {
   normalizePaymentMethod
 } from './services/sales-service.js';
 import { getScaleConfigService } from './services/scale-service.js';
+import { createSingleFlight } from './single-flight.js';
+import { decideSearch, rankProducts, nextHighlight, productThumb, looksLikeBarcode } from './product-search.js';
 
 /* ── scale config cache ── */
 let _scaleConfig = null;
@@ -579,6 +581,7 @@ function clearCurrentSale() {
 
   const searchField = getSearchField();
   if (searchField) searchField.value = '';
+  _pdvCloseSearchDropdown();
 
   const quantityField = getQuantityField();
   if (quantityField) quantityField.value = 1;
@@ -596,25 +599,142 @@ function clearCurrentSale() {
   focusPDVInput();
 }
 
-function resolveProductBySearch(search) {
-  const products = Array.isArray(state.products) ? state.products : [];
-  const value = String(search || '').trim().toLowerCase();
-  const digits = onlyDigits(value);
+/* ================= BUSCA DE PRODUTO — LISTA COMPACTA ================= */
 
-  if (!value) return null;
+// A decisão (barcode > SKU > nome exato > começa com > contém) vive em
+// product-search.js. Aqui fica só o DOM: dropdown logo abaixo do campo de
+// busca, no máximo SEARCH_VISIBLE_ITEMS itens visíveis (rolagem além disso)
+// e SEARCH_MAX_RENDER itens no DOM (nunca centenas).
+const SEARCH_MAX_RENDER = 30;
+let _searchMatches = [];
+let _searchHighlight = -1;
+let _lastCartAddAt = 0;
 
-  return products.find((product) => {
-    const code = String(product.code || '').trim().toLowerCase();
-    const barcode = String(product.barcode || '').trim().toLowerCase();
-    const name = String(product.name || '').trim().toLowerCase();
+function _pdvSearchOpen() {
+  const box = document.getElementById('pdvSearchDropdown');
+  return Boolean(box && !box.classList.contains('hidden') && _searchMatches.length);
+}
 
-    return (
-      code === value ||
-      barcode === value ||
-      onlyDigits(barcode) === digits ||
-      name.includes(value)
-    );
-  }) || null;
+function _pdvCloseSearchDropdown() {
+  _searchMatches = [];
+  _searchHighlight = -1;
+  const box = document.getElementById('pdvSearchDropdown');
+  if (box) {
+    box.classList.add('hidden');
+    box.innerHTML = '';
+  }
+}
+
+function _pdvRenderSearchDropdown() {
+  const bar = getSearchField()?.closest('.pdv-search-bar');
+  if (!bar) return;
+
+  let box = document.getElementById('pdvSearchDropdown');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'pdvSearchDropdown';
+    box.className = 'pdv-search-dropdown hidden';
+    box.setAttribute('role', 'listbox');
+    bar.appendChild(box);
+  }
+
+  const shown = _searchMatches.slice(0, SEARCH_MAX_RENDER);
+  if (!shown.length) {
+    _pdvCloseSearchDropdown();
+    return;
+  }
+
+  box.innerHTML = shown.map((match, i) => {
+    const p = match.product;
+    const thumb = productThumb(p);
+    const stock = Number(p.stock || 0);
+    const price = Number(p.salePrice || p.price || 0);
+    const label = String(p.name || 'Produto');
+    const sku = String(p.code || p.sku || '').trim();
+    const thumbHtml = thumb
+      ? `<img class="pdv-search-thumb" src="${_esc(thumb)}" alt="" loading="lazy" />`
+      : `<span class="pdv-search-thumb pdv-search-thumb-empty" aria-hidden="true">${_esc(label.charAt(0).toUpperCase())}</span>`;
+    return `<div class="pdv-search-item${i === _searchHighlight ? ' is-active' : ''}${stock <= 0 ? ' is-out' : ''}" role="option" aria-selected="${i === _searchHighlight}" data-search-idx="${i}">
+      ${thumbHtml}
+      <span class="pdv-search-info">
+        <span class="pdv-search-name">${_esc(label)}</span>
+        <span class="pdv-search-meta">${formatCurrency(price)} • Estoque ${stock}${sku ? ` • ${_esc(sku)}` : ''}</span>
+      </span>
+    </div>`;
+  }).join('');
+
+  box.classList.remove('hidden');
+  box.querySelector('.is-active')?.scrollIntoView?.({ block: 'nearest' });
+}
+
+function _pdvOpenSearchDropdown(matches) {
+  _searchMatches = Array.isArray(matches) ? matches : [];
+  _searchHighlight = -1;
+  _pdvRenderSearchDropdown();
+}
+
+function _pdvPickSearchProduct(product) {
+  _pdvCloseSearchDropdown();
+  _pdvAddResolvedProduct(product);
+}
+
+// Lista ao vivo enquanto digita. Não abre para código de barras (leitor
+// digita rápido e termina com Enter — o fluxo de Enter resolve direto) nem
+// para etiqueta de balança.
+function _pdvUpdateLiveSearch() {
+  const field = getSearchField();
+  const value = String(field?.value || '').trim();
+  if (value.length < 2 || looksLikeBarcode(value) || _parseScaleBarcode(value)) {
+    _pdvCloseSearchDropdown();
+    return;
+  }
+  const { matches } = rankProducts(state.products, value);
+  if (!matches.length) {
+    _pdvCloseSearchDropdown();
+    return;
+  }
+  _pdvOpenSearchDropdown(matches);
+}
+
+function _bindSearchDropdown() {
+  const field = getSearchField();
+  if (!field || field.dataset.searchDropdownBound === 'true') return;
+  field.dataset.searchDropdownBound = 'true';
+
+  field.addEventListener('input', _pdvUpdateLiveSearch);
+
+  field.addEventListener('keydown', (event) => {
+    if (!_pdvSearchOpen()) return;
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      _searchHighlight = nextHighlight(_searchHighlight, Math.min(_searchMatches.length, SEARCH_MAX_RENDER), event.key);
+      _pdvRenderSearchDropdown();
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      _pdvCloseSearchDropdown();
+    }
+  });
+
+  const bar = field.closest('.pdv-search-bar');
+  bar?.addEventListener('mousedown', (event) => {
+    // mantém o foco no campo ao clicar num item da lista
+    if (event.target.closest('#pdvSearchDropdown')) event.preventDefault();
+  });
+  bar?.addEventListener('click', (event) => {
+    const item = event.target.closest('[data-search-idx]');
+    if (!item) return;
+    const match = _searchMatches[Number(item.dataset.searchIdx)];
+    if (match) _pdvPickSearchProduct(match.product);
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('.pdv-search-bar')) _pdvCloseSearchDropdown();
+  });
 }
 
 /* ================= CART / PRODUTO ================= */
@@ -694,6 +814,17 @@ function addItemToCart() {
 
   const search = searchField?.value || '';
 
+  // Enter com um item destacado na lista (ArrowUp/ArrowDown) escolhe esse
+  // item. Vem antes de tudo: a lista aberta é uma escolha explícita do
+  // operador e nunca deve ser reinterpretada pelo texto do campo.
+  if (_pdvSearchOpen() && _searchHighlight >= 0) {
+    const highlighted = _searchMatches[_searchHighlight];
+    if (highlighted) {
+      _pdvPickSearchProduct(highlighted.product);
+      return;
+    }
+  }
+
   /* ── Scale barcode label: prefix "2", parse product code + weight ── */
   const scaleParsed = _parseScaleBarcode(search);
   if (scaleParsed) {
@@ -725,22 +856,47 @@ function addItemToCart() {
   }
 
   if (!search.trim()) {
+    // Enter dispara addItemToCart() duas vezes no campo de busca (atalho
+    // global + bindBarcodeScanner) — a segunda chamada já encontra o campo
+    // limpo pela primeira. Não avisar "digite o produto" nesse caso.
+    if (Date.now() - _lastCartAddAt < 300) return;
     showToast('Digite o nome ou código do produto.', 'warning');
     focusPDVInput();
     return;
   }
 
-  const product = resolveProductBySearch(search);
+  const decision = decideSearch(state.products, search);
 
-  if (!product) {
-    showToast('Produto não encontrado.', 'warning');
+  if (decision.action === 'not_found') {
+    _pdvCloseSearchDropdown();
+    showToast(
+      decision.reason === 'barcode' ? 'Código de barras não encontrado.' : 'Produto não encontrado.',
+      'warning'
+    );
     focusPDVInput();
     return;
   }
 
+  if (decision.action === 'list') {
+    // Ambíguo (vários parciais, ou mais de um produto com o mesmo nome
+    // exato): nunca escolher sozinho — o operador escolhe na lista.
+    _pdvOpenSearchDropdown(decision.matches);
+    focusPDVInput();
+    return;
+  }
+
+  _pdvCloseSearchDropdown();
+  _pdvAddResolvedProduct(decision.product);
+}
+
+function _pdvAddResolvedProduct(product) {
+  const searchField = getSearchField();
+  const qtyField    = getQuantityField();
+
   /* ── Weight product without scale barcode: open weight modal ── */
   if (_isWeightProduct(product)) {
     _openWeightModal(product);
+    _lastCartAddAt = Date.now();
     if (searchField) searchField.value = '';
     return;
   }
@@ -801,6 +957,7 @@ function _finishAddItemToCart(product, quantity, searchField, qtyField) {
 
   renderCart();
 
+  _lastCartAddAt = Date.now();
   if (searchField) searchField.value = '';
   if (qtyField)    qtyField.value    = 1;
 
@@ -1659,7 +1816,21 @@ async function refreshSalesState() {
   }
 }
 
+// Único ponto que persiste venda (F10/#finalizeSaleBtn, #pmConfirm do modal e
+// pollMercadoPagoStatus convergem aqui). Uma venda em voo por vez: duplo
+// clique/F10 repetido durante o POST /v1/sales era capaz de criar duas vendas.
+// O lock é liberado em sucesso E falha, então a tentativa seguinte é sempre
+// aceita; o erro original continua propagando para o chamador.
+const _saleSingleFlight = createSingleFlight();
+
 async function persistApprovedSale(payload) {
+  const result = await _saleSingleFlight(() => _persistApprovedSaleOnce(payload));
+  if (result.skipped) {
+    showToast('A venda já está sendo finalizada. Aguarde.', 'warning');
+  }
+}
+
+async function _persistApprovedSaleOnce(payload) {
   const createdSale = await createSaleService(payload);
 
   if (createdSale) {
@@ -3647,6 +3818,7 @@ export function bindPDVActions() {
   bindKioskGuard();
   bindPDVKeyboardShortcuts();
   bindBarcodeScanner();
+  _bindSearchDropdown();
   _bindWeightModal();
   _bindCancelItemModal();
   _bindCancelSaleModal();

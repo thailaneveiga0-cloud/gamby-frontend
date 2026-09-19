@@ -640,6 +640,29 @@ select option { background:#0c1929; }
   transition:border-color .14s, background .14s; min-width:0; width:auto;
 }
 .pdv-search-input:focus { border-color:rgba(37,99,235,0.5); background:rgba(255,255,255,0.06); box-shadow:0 0 0 3px rgba(37,99,235,0.1); }
+
+/* Lista compacta de resultados da busca do PDV (5–6 itens visíveis, rolagem além disso) */
+.pdv-search-dropdown {
+  position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:60;
+  max-height:324px; overflow-y:auto; overscroll-behavior:contain;
+  background:var(--card); border:1px solid var(--line2); border-radius:var(--radius-lg);
+  box-shadow:0 12px 32px rgba(0,0,0,0.35); padding:4px;
+}
+.pdv-search-dropdown.hidden { display:none; }
+.pdv-search-item {
+  display:flex; align-items:center; gap:10px; min-height:52px; padding:4px 8px;
+  border-radius:8px; cursor:pointer; color:var(--text);
+}
+.pdv-search-item:hover, .pdv-search-item.is-active { background:rgba(37,99,235,0.18); }
+.pdv-search-thumb {
+  width:44px; height:44px; border-radius:8px; object-fit:cover; flex-shrink:0;
+  background:rgba(255,255,255,0.06);
+}
+.pdv-search-thumb-empty { display:grid; place-items:center; font-weight:700; color:#60a5fa; }
+.pdv-search-info { display:flex; flex-direction:column; min-width:0; }
+.pdv-search-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pdv-search-meta { font-size:12px; opacity:.72; }
+.pdv-search-item.is-out .pdv-search-meta { color:#f87171; opacity:1; }
 .pdv-qty-ctrl-bar {
   display:flex; align-items:center; gap:4px; flex-shrink:0;
 }

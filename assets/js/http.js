@@ -304,22 +304,24 @@ function shouldAttachAuth(url) {
   return !isPublicRoute(url);
 }
 
-// BUG REAL DE STAGING (2026-09-19), Bug A: rotas onde 401 significa
-// "credencial OPERACIONAL inválida" (PIN de operador incorreto —
-// operator-pin.service.js:loginWithPin), nunca "JWT expirado". Sem esta
-// exclusão, um PIN de operador digitado errado disparava o mesmo pipeline
-// de refresh-de-token/logout usado para JWT realmente expirado — e se o
-// refresh não se completasse com sucesso (por qualquer motivo), a sessão
-// da CONTA inteira era apagada por causa de um PIN de 4-6 dígitos errado,
-// sem relação nenhuma com o JWT.
-const _OPERATIONAL_401_ROUTES = [
-  '/v1/pdv/operator-pin/login',
-  '/v1/pdv/operator-pin/switch',
-];
+// BUG REAL DE STAGING (2026-09-19), Bug A: POST /v1/pdv/operator-pin/login e
+// /switch podem responder 401 por dois motivos na MESMA URL, porque
+// requireAuth roda antes do controller: (1) PIN de operador errado — o JWT
+// está válido; (2) JWT ausente/inválido. Só (2) deve passar pelo pipeline
+// de refresh/expiração de sessão; tratar (1) assim derrubava a sessão da
+// conta inteira por causa de um PIN errado. Excluir a URL inteira (versão
+// anterior desta correção) também era errado: um JWT realmente inválido
+// nessas rotas nunca era renovado. A decisão vem do `error` semântico do
+// backend (operator-pin.service.js/pdv.controller.js), nunca de URL/status.
+const _OPERATOR_PIN_ERROR_CODES = new Set([
+  'operator_pin_invalid',
+  'operator_pin_locked',
+  'operator_pin_not_configured',
+  'operator_inactive',
+]);
 
-function isOperational401Route(url) {
-  const u = String(url || '');
-  return _OPERATIONAL_401_ROUTES.some(p => u.includes(p));
+function isOperatorPinBusinessError(payload) {
+  return _OPERATOR_PIN_ERROR_CODES.has(payload?.error);
 }
 
 export async function httpRequest(url, options = {}) {
@@ -409,7 +411,7 @@ if (DEBUG_HTTP) {
     if (!response.ok) {
       const errorMessage = extractErrorMessage(payload, response.status);
 
-      if (response.status === 401 && !options._retried && !isOperational401Route(url)) {
+      if (response.status === 401 && !options._retried && !isOperatorPinBusinessError(payload)) {
         if (!_refreshPromise) {
           _refreshPromise = _tryRefreshToken().finally(() => { _refreshPromise = null; });
         }

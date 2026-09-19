@@ -36,7 +36,7 @@ import { getRoleLabel } from './roles.js';
 import { applyRoleVisibility } from './ui.js';
 import { applyVisibility as govApplyVisibility, getDefaultPage as govGetDefaultPage, canNavigate as govCanNavigate } from './gov-access.js';
 import { applyMenuSecurity } from './security-policy.js';
-import { enforcePDVKioskMode, requirePDVAdminAuthorization } from './pdv-kiosk.js';
+import { enforcePDVKioskMode, releasePDVKioskMode, requirePDVAdminAuthorization } from './pdv-kiosk.js';
 import { audit } from './audit-service.js';
 
 const ACTIVE_PROFILE_KEY = 'gamby_active_profile';
@@ -183,6 +183,17 @@ export function applyProfileRestrictions(profile) {
   ].forEach((sel) => {
     document.querySelector(sel)?.classList.remove('hidden');
   });
+
+  // O kiosk também vive em classes de <body>/.app-shell (pdv-kiosk-active,
+  // pdv-fullscreen, pdv-only-mode), cujo CSS esconde sidebar, hover zone,
+  // toggle e topbar com !important — remover .hidden acima não desfaz isso.
+  // openPageDirect() (chamada mais abaixo) só libera o kiosk DEPOIS de dois
+  // returns antecipados (canAccessPage/denyAccess), então uma transição que
+  // caísse neles deixava o Administrador/Gerente preso no layout do Operador
+  // ("às vezes sem sidebar"). Liberação determinística aqui, guardada por
+  // window.__pdvKioskActive para não gerar auditoria "kiosk.exit"/recriar o
+  // Copilot no login normal, onde o kiosk nunca esteve ligado.
+  if (role !== 'operador' && window.__pdvKioskActive) releasePDVKioskMode();
 
   // Chamada direta e explícita — não depende só da cadeia openPageDirect()
   // (que já chama isso para safePage==='pdv') chegar até o fim corretamente.
